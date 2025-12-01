@@ -344,4 +344,3 @@ Website: https://www.sacscomputers.com/
 ---
 
 For detailed cPanel deployment instructions, see the inline deployment steps above or refer to the deployment script: `deploy-cpanel.sh`
-# ServiceMan-Laravel
