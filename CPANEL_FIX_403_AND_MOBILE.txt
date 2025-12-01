@@ -1,0 +1,176 @@
+╔══════════════════════════════════════════════════════════════╗
+║  FIX: 403 Forbidden + Mobile Status Display Issues          ║
+╚══════════════════════════════════════════════════════════════╝
+
+🐛 BUGS:
+   1. Users getting 403 Forbidden when viewing their own service requests
+   2. Status displays not responsive on mobile
+
+📁 FILES TO UPDATE:
+   1. serviceman.sekimbi.com/app/Http/Controllers/Web/ServiceRequestController.php
+   2. serviceman.sekimbi.com/resources/views/service-requests/index.blade.php
+   3. serviceman.sekimbi.com/resources/views/service-requests/show.blade.php
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FILE 1: ServiceRequestController.php
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 FIND THIS (around line 218-233):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        } elseif ($user->isClient()) {
+            // Clients can only view their own requests
+            if ($serviceRequest->client_id !== $user->id) {
+                abort(403);
+            }
+        } elseif ($user->isServiceman()) {
+            // Servicemen can only view requests that have been actually assigned to them
+            $assignedStatuses = ['ASSIGNED_TO_SERVICEMAN', 'SERVICEMAN_INSPECTED', 'AWAITING_CLIENT_APPROVAL', 'NEGOTIATING', 'AWAITING_PAYMENT', 'PAYMENT_CONFIRMED', 'IN_PROGRESS', 'COMPLETED'];
+            
+            if (($serviceRequest->serviceman_id !== $user->id && $serviceRequest->backup_serviceman_id !== $user->id) ||
+                !in_array($serviceRequest->status, $assignedStatuses)) {
+                abort(403, 'You do not have access to this service request.');
+            }
+        } else {
+            abort(403);
+        }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✏️ REPLACE WITH:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        } elseif ($user->isClient()) {
+            // Clients can only view their own requests - use loose comparison to handle type mismatches
+            if ((int)$serviceRequest->client_id !== (int)$user->id) {
+                \Log::warning('Access denied to service request', [
+                    'service_request_id' => $serviceRequest->id,
+                    'client_id' => $serviceRequest->client_id,
+                    'user_id' => $user->id,
+                    'client_id_type' => gettype($serviceRequest->client_id),
+                    'user_id_type' => gettype($user->id),
+                ]);
+                abort(403, 'You do not have access to this service request.');
+            }
+        } elseif ($user->isServiceman()) {
+            // Servicemen can only view requests that have been actually assigned to them
+            $assignedStatuses = ['ASSIGNED_TO_SERVICEMAN', 'SERVICEMAN_INSPECTED', 'AWAITING_CLIENT_APPROVAL', 'NEGOTIATING', 'AWAITING_PAYMENT', 'PAYMENT_CONFIRMED', 'IN_PROGRESS', 'WORK_COMPLETED', 'COMPLETED'];
+            
+            if (((int)$serviceRequest->serviceman_id !== (int)$user->id && (int)$serviceRequest->backup_serviceman_id !== (int)$user->id) ||
+                !in_array($serviceRequest->status, $assignedStatuses)) {
+                abort(403, 'You do not have access to this service request.');
+            }
+        } else {
+            abort(403, 'Access denied.');
+        }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FILE 2: service-requests/index.blade.php
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 FIND THIS (around line 163-173):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                                <!-- Right Side: Status & Actions -->
+                                <div class="flex flex-col items-end space-y-3 ml-4">
+                                    <!-- Status Badge -->
+                                    <span class="px-4 py-2 text-sm font-bold rounded-xl shadow-sm {{ 
+                                        $request->status === 'PENDING_ADMIN_ASSIGNMENT' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                                        ($request->status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                        ($request->status === 'IN_PROGRESS' ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+                                        ($request->status === 'COMPLETED' ? 'bg-green-100 text-green-800 border border-green-200' :
+                                        'bg-gray-100 text-gray-800 border border-gray-200')))
+                                    }}">
+                                        {{ str_replace('_', ' ', ucwords(strtolower($request->status))) }}
+                                    </span>
+
+                                </div>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✏️ REPLACE WITH:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                                <!-- Right Side: Status & Actions -->
+                                <div class="flex flex-col sm:flex-row items-start sm:items-end space-y-2 sm:space-y-0 sm:space-x-3 ml-0 sm:ml-4 mt-4 sm:mt-0 w-full sm:w-auto">
+                                    <!-- Status Badge - Full width on mobile -->
+                                    <span class="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl shadow-sm whitespace-nowrap text-center sm:text-left {{ 
+                                        $request->status === 'PENDING_ADMIN_ASSIGNMENT' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                                        ($request->status === 'ASSIGNED_TO_SERVICEMAN' || $request->status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                        ($request->status === 'SERVICEMAN_INSPECTED' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
+                                        ($request->status === 'IN_PROGRESS' ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+                                        ($request->status === 'COMPLETED' ? 'bg-green-100 text-green-800 border border-green-200' :
+                                        ($request->status === 'AWAITING_PAYMENT' || $request->status === 'PAYMENT_CONFIRMED' ? 'bg-green-100 text-green-800 border border-green-200' :
+                                        'bg-gray-100 text-gray-800 border border-gray-200')))))
+                                    }}">
+                                        {{ \App\Models\ServiceRequest::STATUS_CHOICES[$request->status] ?? str_replace('_', ' ', ucwords(strtolower($request->status))) }}
+                                    </span>
+                                </div>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FILE 3: service-requests/show.blade.php
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 FIND THIS (around line 43-59):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Service Request #{{ $serviceRequest->id }}</h1>
+                    <p class="mt-2 text-gray-600">{{ $statusMessage }}</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="px-3 py-1 text-sm font-medium rounded-full {{ 
+                        $serviceRequest->is_emergency ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800' 
+                    }}">
+                        {{ $serviceRequest->is_emergency ? 'Emergency' : 'Normal' }}
+                    </span>
+                    <span class="px-3 py-1 text-sm font-medium rounded-full bg-gray-100 text-gray-800">
+                        {{ $serviceRequest->status }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✏️ REPLACE WITH:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Service Request #{{ $serviceRequest->id }}</h1>
+                    <p class="mt-2 text-sm sm:text-base text-gray-600">{{ $statusMessage }}</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+                    <span class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap {{ 
+                        $serviceRequest->is_emergency ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800' 
+                    }}">
+                        {{ $serviceRequest->is_emergency ? 'Emergency' : 'Normal' }}
+                    </span>
+                    <span class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap bg-gray-100 text-gray-800">
+                        {{ \App\Models\ServiceRequest::STATUS_CHOICES[$serviceRequest->status] ?? str_replace('_', ' ', ucwords(strtolower($serviceRequest->status))) }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ WHAT THIS FIXES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Fixes 403 error by using proper type casting (int)
+✅ Status badges now responsive on mobile
+✅ Better text wrapping and spacing on small screens
+✅ Status labels use proper human-readable format
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

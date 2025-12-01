@@ -156,9 +156,13 @@ echo -e "${YELLOW}   ⚠️  This may take a few minutes (vendor directory is la
 
 # Create zip excluding unnecessary files BUT INCLUDING vendor
 # Note: We exclude cache files but keep directory structure with .gitkeep
+# IMPORTANT: Exclude bootstrap/cache/*.php files - they must be regenerated on server
 zip -r "$ZIP_NAME" . \
     -x "*.git*" \
     -x "node_modules/*" \
+    -x "bootstrap/cache/*.php" \
+    -x "bootstrap/cache/packages.php" \
+    -x "bootstrap/cache/services.php" \
     -x "storage/logs/*.log" \
     -x "storage/logs/laravel.log" \
     -x "storage/framework/cache/data/*" \

@@ -1,0 +1,71 @@
+╔══════════════════════════════════════════════════════════════╗
+║          QUICK FIX: Email Verification Route Access         ║
+╚══════════════════════════════════════════════════════════════╝
+
+📁 FILE TO UPDATE:
+   serviceman.sekimbi.com/app/Http/Middleware/EnsureEmailIsVerified.php
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 FIND THIS SECTION (around line 30-36):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            $allowedRoutes = [
+                'logout',
+                'verification.verify',
+                'profile',
+                'profile.client',
+                'profile.serviceman',
+            ];
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✏️ REPLACE WITH THIS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            $allowedRoutes = [
+                'logout',
+                'verification.verify',
+                'verification.resend',  // Allow resending verification email
+                'verification.send',     // Alternative route name
+                'profile',
+                'profile.client',
+                'profile.serviceman',
+                'profile.update',
+                'profile.client.update',
+                'profile.serviceman.update',
+            ];
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 STEPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Open cPanel File Manager
+2. Navigate to: serviceman.sekimbi.com/app/Http/Middleware/
+3. Edit: EnsureEmailIsVerified.php
+4. Find the $allowedRoutes array
+5. Add the two new lines shown above
+6. Save the file
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ AFTER UPDATING:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Run this in cPanel Terminal (optional - clears cache):
+
+cd ~/serviceman.sekimbi.com
+php artisan optimize:clear
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 WHAT THIS FIXES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Users can now click "Resend Verification Email" even if not verified
+✅ No more "Email verification required" error when requesting new email
+✅ Users can resend verification email from their profile page
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

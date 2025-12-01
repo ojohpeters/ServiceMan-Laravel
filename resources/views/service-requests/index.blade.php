@@ -109,67 +109,73 @@
                 @foreach($serviceRequests as $request)
                     <div class="request-card bg-white rounded-2xl shadow-lg overflow-hidden border-l-4 {{ $request->is_emergency ? 'border-red-500' : 'border-blue-500' }}">
                         <!-- Card Header -->
-                        <div class="p-6">
-                            <div class="flex items-start justify-between">
+                        <div class="p-4 sm:p-6">
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 overflow-hidden">
                                 <!-- Left Side: Request Info -->
-                                <div class="flex-1">
-                                    <div class="flex items-center space-x-3 mb-3">
-                                        <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                                            <span class="text-white font-bold text-lg">#{{ $request->id }}</span>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-start space-x-3 mb-3">
+                                        <div class="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                                            <span class="text-white font-bold text-sm sm:text-lg">#{{ $request->id }}</span>
                                         </div>
-                                        <div class="flex-1">
-                                            <div class="flex items-center space-x-2 mb-1">
-                                                <h3 class="text-lg font-bold text-gray-900">{{ $request->category->name }}</h3>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                                <h3 class="text-base sm:text-lg font-bold text-gray-900 break-words">{{ $request->category->name }}</h3>
                                                 @if($request->is_emergency)
-                                                    <span class="px-3 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full border border-red-200 flex items-center">
+                                                    <span class="px-2 sm:px-3 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full border border-red-200 flex items-center whitespace-nowrap">
                                                         <i class="fas fa-exclamation-triangle mr-1"></i>Emergency
                                                     </span>
                                                 @endif
                                             </div>
-                                            <p class="text-sm text-gray-600 line-clamp-2">{{ $request->service_description }}</p>
+                                            <p class="text-xs sm:text-sm text-gray-600 line-clamp-2 break-words">{{ $request->service_description }}</p>
                                         </div>
                                     </div>
                                     
                                     <!-- Quick Stats -->
-                                    <div class="flex flex-wrap items-center gap-3 text-sm">
-                                        <span class="flex items-center text-gray-700">
-                                            <i class="fas fa-calendar mr-2 text-blue-600"></i>
-                                            <strong class="mr-1">Booking:</strong> {{ $request->booking_date->format('M d, Y') }}
+                                    <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+                                        <span class="flex items-center text-gray-700 whitespace-nowrap">
+                                            <i class="fas fa-calendar mr-1 sm:mr-2 text-blue-600 text-xs"></i>
+                                            <strong class="mr-1 hidden sm:inline">Booking:</strong>
+                                            <span>{{ $request->booking_date->format('M d, Y') }}</span>
                                         </span>
-                                        <span class="flex items-center text-gray-700">
-                                            <i class="fas fa-clock mr-2 text-green-600"></i>
-                                            <strong class="mr-1">Created:</strong> {{ $request->created_at->diffForHumans() }}
+                                        <span class="flex items-center text-gray-700 whitespace-nowrap">
+                                            <i class="fas fa-clock mr-1 sm:mr-2 text-green-600 text-xs"></i>
+                                            <strong class="mr-1 hidden sm:inline">Created:</strong>
+                                            <span>{{ $request->created_at->diffForHumans() }}</span>
                                         </span>
                                         @if($request->final_cost)
-                                            <span class="flex items-center text-green-700 font-bold">
-                                                <i class="fas fa-money-bill-wave mr-2"></i>
+                                            <span class="flex items-center text-green-700 font-bold whitespace-nowrap">
+                                                <i class="fas fa-money-bill-wave mr-1 sm:mr-2 text-xs"></i>
                                                 ₦{{ number_format($request->final_cost) }}
                                             </span>
                                         @elseif($request->serviceman_estimated_cost)
                                             <span class="flex items-center text-yellow-700 font-bold">
-                                                <i class="fas fa-calculator mr-2"></i>
-                                                ₦{{ number_format($request->serviceman_estimated_cost) }} (estimated)
+                                                <i class="fas fa-calculator mr-1 sm:mr-2 text-xs"></i>
+                                                <span class="hidden sm:inline">₦{{ number_format($request->serviceman_estimated_cost) }} (estimated)</span>
+                                                <span class="sm:hidden">₦{{ number_format($request->serviceman_estimated_cost) }}</span>
                                             </span>
                                         @else
-                                            <span class="flex items-center text-gray-700 font-bold">
-                                                <i class="fas fa-money-bill mr-2"></i>
-                                                ₦{{ number_format($request->initial_booking_fee) }} (booking fee)
+                                            <span class="flex items-center text-gray-700 font-bold whitespace-nowrap">
+                                                <i class="fas fa-money-bill mr-1 sm:mr-2 text-xs"></i>
+                                                <span class="hidden sm:inline">₦{{ number_format($request->initial_booking_fee) }} (booking fee)</span>
+                                                <span class="sm:hidden">₦{{ number_format($request->initial_booking_fee) }}</span>
                                             </span>
                                         @endif
                                     </div>
                                 </div>
 
                                 <!-- Right Side: Status & Actions -->
-                                <div class="flex flex-col items-end space-y-3 ml-4">
-                                    <!-- Status Badge -->
-                                    <span class="px-4 py-2 text-sm font-bold rounded-xl shadow-sm {{ 
+                                <div class="flex flex-col sm:flex-row items-start sm:items-end space-y-2 sm:space-y-0 sm:space-x-3 ml-0 sm:ml-4 mt-4 sm:mt-0 w-full sm:w-auto">
+                                    <!-- Status Badge - Full width on mobile -->
+                                    <span class="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl shadow-sm whitespace-nowrap text-center sm:text-left {{ 
                                         $request->status === 'PENDING_ADMIN_ASSIGNMENT' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                                        ($request->status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                        ($request->status === 'ASSIGNED_TO_SERVICEMAN' || $request->status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                        ($request->status === 'SERVICEMAN_INSPECTED' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
                                         ($request->status === 'IN_PROGRESS' ? 'bg-purple-100 text-purple-800 border border-purple-200' :
                                         ($request->status === 'COMPLETED' ? 'bg-green-100 text-green-800 border border-green-200' :
-                                        'bg-gray-100 text-gray-800 border border-gray-200')))
+                                        ($request->status === 'AWAITING_PAYMENT' || $request->status === 'PAYMENT_CONFIRMED' ? 'bg-green-100 text-green-800 border border-green-200' :
+                                        'bg-gray-100 text-gray-800 border border-gray-200')))))
                                     }}">
-                                        {{ str_replace('_', ' ', ucwords(strtolower($request->status))) }}
+                                        {{ \App\Models\ServiceRequest::STATUS_CHOICES[$request->status] ?? str_replace('_', ' ', ucwords(strtolower($request->status))) }}
                                     </span>
 
                                 </div>

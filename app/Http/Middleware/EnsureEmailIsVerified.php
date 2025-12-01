@@ -30,9 +30,17 @@ class EnsureEmailIsVerified
             $allowedRoutes = [
                 'logout',
                 'verification.verify',
+                'verification.resend',  // Allow resending verification email
+                'verification.send',     // Alternative route name
                 'profile',
                 'profile.client',
                 'profile.serviceman',
+                'profile.update',
+                'profile.client.update',
+                'profile.serviceman.update',
+                // Service request viewing - users should be able to view their own requests
+                'service-requests.index',  // View all their service requests
+                'service-requests.show',   // View specific service request details
             ];
 
             $routeName = $request->route()?->getName();

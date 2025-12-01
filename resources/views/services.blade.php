@@ -202,9 +202,9 @@
     <!-- Emergency Services Banner -->
     <section class="py-12 bg-red-50 border-l-4 border-red-500">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div class="flex items-center">
-                    <div class="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mr-4">
+                    <div class="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
                         <i class="fas fa-exclamation-triangle text-white text-xl"></i>
                     </div>
                     <div>
@@ -214,11 +214,31 @@
                 </div>
                 <button 
                     @click="bookEmergencyService()"
-                    class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                    class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
                 >
                     <i class="fas fa-phone mr-2"></i>
                     Call Emergency
                 </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Custom Service Request Section -->
+    <section class="py-16 bg-gray-50">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="bg-white rounded-2xl shadow-lg p-8 sm:p-12">
+                <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-lightbulb text-blue-600 text-3xl"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">Don't See What You're Looking For?</h2>
+                <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+                    Need a service that's not listed? Request a custom service and we'll connect you with the right professional for your specific needs.
+                </p>
+                <a href="{{ route('contact') }}" 
+                   class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg text-lg font-bold transition-colors shadow-lg">
+                    <i class="fas fa-envelope mr-2"></i>
+                    Request a Custom Service
+                </a>
             </div>
         </div>
     </section>

@@ -216,20 +216,27 @@ class ServiceRequestController extends Controller
         if ($user->isAdmin()) {
             // Admins can view all requests
         } elseif ($user->isClient()) {
-            // Clients can only view their own requests
-            if ($serviceRequest->client_id !== $user->id) {
-                abort(403);
+            // Clients can only view their own requests - use loose comparison to handle type mismatches
+            if ((int)$serviceRequest->client_id !== (int)$user->id) {
+                \Log::warning('Access denied to service request', [
+                    'service_request_id' => $serviceRequest->id,
+                    'client_id' => $serviceRequest->client_id,
+                    'user_id' => $user->id,
+                    'client_id_type' => gettype($serviceRequest->client_id),
+                    'user_id_type' => gettype($user->id),
+                ]);
+                abort(403, 'You do not have access to this service request.');
             }
         } elseif ($user->isServiceman()) {
             // Servicemen can only view requests that have been actually assigned to them
-            $assignedStatuses = ['ASSIGNED_TO_SERVICEMAN', 'SERVICEMAN_INSPECTED', 'AWAITING_CLIENT_APPROVAL', 'NEGOTIATING', 'AWAITING_PAYMENT', 'PAYMENT_CONFIRMED', 'IN_PROGRESS', 'COMPLETED'];
+            $assignedStatuses = ['ASSIGNED_TO_SERVICEMAN', 'SERVICEMAN_INSPECTED', 'AWAITING_CLIENT_APPROVAL', 'NEGOTIATING', 'AWAITING_PAYMENT', 'PAYMENT_CONFIRMED', 'IN_PROGRESS', 'WORK_COMPLETED', 'COMPLETED'];
             
-            if (($serviceRequest->serviceman_id !== $user->id && $serviceRequest->backup_serviceman_id !== $user->id) ||
+            if (((int)$serviceRequest->serviceman_id !== (int)$user->id && (int)$serviceRequest->backup_serviceman_id !== (int)$user->id) ||
                 !in_array($serviceRequest->status, $assignedStatuses)) {
                 abort(403, 'You do not have access to this service request.');
             }
         } else {
-            abort(403);
+            abort(403, 'Access denied.');
         }
 
         // Get status message for UI

@@ -273,47 +273,71 @@ class AuthController extends Controller
 
         // Check if user is authenticated
         if (!$user) {
-            if ($request->expectsJson()) {
-                return response()->json(['error' => 'Unauthorized'], 401);
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['error' => 'Unauthorized. Please login first.'], 401);
             }
             return redirect('/login')->with('error', 'Please login to resend verification email.');
         }
 
         // Check if email is already verified
         if ($user->is_email_verified) {
-            if ($request->expectsJson()) {
-                return response()->json(['message' => 'Email is already verified'], 400);
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['message' => 'Your email is already verified.', 'info' => true], 200);
             }
             return back()->with('info', 'Your email is already verified.');
         }
 
         // Generate new verification token (replaces old one if expired)
         $verificationToken = \Illuminate\Support\Str::random(64);
-        $user->update([
-            'email_verification_token' => $verificationToken
-        ]);
-
-        // Send verification email
+        
         try {
-            $verificationUrl = url("/verify-email/{$verificationToken}");
-            Mail::to($user->email)->send(new \App\Mail\VerifyEmail($user, $verificationUrl));
-        } catch (\Exception $e) {
-            \Log::error('Failed to send verification email: ' . $e->getMessage());
-            
-            if ($request->expectsJson()) {
-                return response()->json(['error' => 'Failed to send verification email. Please try again later.'], 500);
-            }
-            return back()->with('error', 'Failed to send verification email. Please try again later or contact support.');
-        }
+            $user->update([
+                'email_verification_token' => $verificationToken
+            ]);
 
-        if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Verification email sent successfully! Please check your inbox.',
+            // Send verification email
+            $verificationUrl = url("/verify-email/{$verificationToken}");
+            
+            \Log::info('Attempting to send verification email', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'url' => $verificationUrl
+            ]);
+            
+            Mail::to($user->email)->send(new \App\Mail\VerifyEmail($user, $verificationUrl));
+            
+            \Log::info('Verification email sent successfully', [
+                'user_id' => $user->id,
                 'email' => $user->email
             ]);
-        }
+            
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Verification email sent successfully! Please check your inbox at ' . $user->email,
+                    'email' => $user->email
+                ], 200);
+            }
 
-        return back()->with('success', 'Verification email sent successfully! Please check your inbox at ' . $user->email);
+            return back()->with('success', 'Verification email sent successfully! Please check your inbox at ' . $user->email);
+            
+        } catch (\Exception $e) {
+            \Log::error('Failed to send verification email', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'error' => 'Failed to send verification email: ' . $e->getMessage() . '. Please check your email configuration or contact support.',
+                    'debug' => config('app.debug') ? $e->getMessage() : null
+                ], 500);
+            }
+            
+            return back()->with('error', 'Failed to send verification email. Please try again later or contact support.');
+        }
     }
 
     public function showPendingVerification()

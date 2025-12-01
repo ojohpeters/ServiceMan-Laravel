@@ -1,0 +1,19 @@
+==========================================
+QUICK FIX: Laravel Pail Error
+==========================================
+
+Run these commands in cPanel Terminal:
+
+cd ~/serviceman.sekimbi.com
+
+rm -f bootstrap/cache/packages.php
+rm -f bootstrap/cache/services.php
+rm -f bootstrap/cache/config.php
+
+php artisan optimize:clear
+php artisan optimize
+
+Then refresh your website!
+
+==========================================
+

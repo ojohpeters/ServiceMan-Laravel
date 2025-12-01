@@ -3,31 +3,36 @@
 @section('title', $user->full_name . ' - ServiceMan')
 
 @section('content')
-<div class="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
+<div class="max-w-4xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
     <!-- Profile Header -->
     <div class="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:p-8 mb-6">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
-            <img src="{{ $user->profile_picture_url }}" 
-                 alt="{{ $user->full_name }}" 
-                 class="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover border-4 border-blue-100 shadow-lg mx-auto sm:mx-0">
-            <div class="flex-1 text-center sm:text-left w-full sm:w-auto">
-                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">{{ $user->full_name }}</h1>
-                <p class="text-base sm:text-lg text-gray-600">{{ $user->servicemanProfile->category->name ?? 'Professional' }}</p>
+        <div class="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
+            <!-- Profile Picture -->
+            <div class="flex-shrink-0 mx-auto lg:mx-0">
+                <img src="{{ $user->profile_picture_url }}" 
+                     alt="{{ $user->full_name }}" 
+                     class="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover border-4 border-blue-100 shadow-lg">
+            </div>
+            
+            <!-- Profile Info -->
+            <div class="flex-1 min-w-0 text-center lg:text-left w-full">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 break-words">{{ $user->full_name }}</h1>
+                <p class="text-base sm:text-lg text-gray-600 mt-1">{{ $user->servicemanProfile->category->name ?? 'Professional' }}</p>
                 
                 @if($user->ratingsReceived->count() > 0)
-                    <div class="flex items-center mt-2">
+                    <div class="flex items-center justify-center lg:justify-start mt-2 flex-wrap gap-2">
                         @for($i = 1; $i <= 5; $i++)
                             <i class="fas fa-star {{ $i <= $user->ratingsReceived->avg('rating') ? 'text-yellow-400' : 'text-gray-300' }}"></i>
                         @endfor
-                        <span class="ml-2 text-gray-600">
+                        <span class="text-sm text-gray-600">
                             {{ number_format($user->ratingsReceived->avg('rating'), 1) }} ({{ $user->ratingsReceived->count() }} reviews)
                         </span>
                     </div>
                 @else
-                    <p class="text-gray-500 mt-2">No reviews yet</p>
+                    <p class="text-gray-500 mt-2 text-sm">No reviews yet</p>
                 @endif
                 
-                <div class="flex flex-wrap items-center justify-center sm:justify-start mt-4 gap-2 sm:gap-4">
+                <div class="flex flex-wrap items-center justify-center lg:justify-start mt-4 gap-2">
                     <span class="px-3 py-1 text-xs sm:text-sm font-medium rounded-full {{ $user->servicemanProfile->is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
                         {{ $user->servicemanProfile->is_available ? 'Available' : 'Busy' }}
                     </span>
@@ -38,37 +43,36 @@
                             {{ $user->servicemanProfile->experience_years }} years experience
                         </span>
                     @endif
-                    
                 </div>
             </div>
             
-            <div class="w-full sm:w-auto mt-4 sm:mt-0 sm:text-right">
-                @auth
-                    @if(auth()->user()->isClient())
-                        @if($user->servicemanProfile->is_available)
-                            <a href="{{ route('service-requests.create') }}?serviceman_id={{ $user->id }}" 
-                               class="w-full sm:w-auto inline-flex items-center justify-center bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg text-sm sm:text-base">
-                                <i class="fas fa-calendar-check mr-2"></i>Book Now
-                            </a>
-                        @else
-                            <button disabled class="w-full sm:w-auto inline-flex items-center justify-center bg-gray-400 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold cursor-not-allowed text-sm sm:text-base">
-                                <i class="fas fa-ban mr-2"></i>Currently Unavailable
-                            </button>
-                        @endif
+            <!-- Action Button - Full width on mobile, positioned on desktop -->
+            <div class="w-full lg:w-auto lg:flex-shrink-0 lg:text-right mt-4 lg:mt-0">
+            @auth
+                @if(auth()->user()->isClient())
+                    @if($user->servicemanProfile->is_available)
+                        <a href="{{ route('service-requests.create') }}?serviceman_id={{ $user->id }}" 
+                           class="w-full sm:w-auto block sm:inline-block text-center bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg whitespace-nowrap">
+                            <i class="fas fa-calendar-check mr-2"></i>Book Now
+                        </a>
                     @else
-                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4">
-                            <p class="text-xs sm:text-sm text-yellow-800">
-                                <i class="fas fa-info-circle mr-2"></i>Only clients can book services
-                            </p>
-                        </div>
+                        <button disabled class="w-full sm:w-auto block sm:inline-block text-center bg-gray-400 text-white px-6 py-3 rounded-lg font-semibold cursor-not-allowed whitespace-nowrap">
+                            <i class="fas fa-ban mr-2"></i>Currently Unavailable
+                        </button>
                     @endif
                 @else
-                    <a href="{{ route('login') }}?redirect={{ urlencode(url()->current()) }}" 
-                       class="w-full sm:w-auto inline-flex items-center justify-center bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg text-sm sm:text-base">
-                        <i class="fas fa-sign-in-alt mr-2"></i>Login to Book
-                    </a>
-                @endauth
-            </div>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4">
+                        <p class="text-xs sm:text-sm text-yellow-800 text-center sm:text-left">
+                            <i class="fas fa-info-circle mr-2"></i>Only clients can book services
+                        </p>
+                    </div>
+                @endif
+            @else
+                <a href="{{ route('login') }}?redirect={{ urlencode(url()->current()) }}" 
+                   class="w-full sm:w-auto block sm:inline-block text-center bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg whitespace-nowrap">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Login to Book
+                </a>
+            @endauth
         </div>
     </div>
 

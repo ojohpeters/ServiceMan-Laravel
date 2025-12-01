@@ -41,19 +41,19 @@
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Header -->
         <div class="mb-8">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-900">Service Request #{{ $serviceRequest->id }}</h1>
-                    <p class="mt-2 text-gray-600">{{ $statusMessage }}</p>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Service Request #{{ $serviceRequest->id }}</h1>
+                    <p class="mt-2 text-sm sm:text-base text-gray-600">{{ $statusMessage }}</p>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <span class="px-3 py-1 text-sm font-medium rounded-full {{ 
+                <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+                    <span class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap {{ 
                         $serviceRequest->is_emergency ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800' 
                     }}">
                         {{ $serviceRequest->is_emergency ? 'Emergency' : 'Normal' }}
                     </span>
-                    <span class="px-3 py-1 text-sm font-medium rounded-full bg-gray-100 text-gray-800">
-                        {{ $serviceRequest->status }}
+                    <span class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap bg-gray-100 text-gray-800">
+                        {{ \App\Models\ServiceRequest::STATUS_CHOICES[$serviceRequest->status] ?? str_replace('_', ' ', ucwords(strtolower($serviceRequest->status))) }}
                     </span>
                 </div>
             </div>

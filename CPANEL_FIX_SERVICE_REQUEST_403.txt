@@ -1,0 +1,92 @@
+╔══════════════════════════════════════════════════════════════╗
+║     FIX: 403 Forbidden When Viewing Service Requests       ║
+╚══════════════════════════════════════════════════════════════╝
+
+🐛 BUG:
+   Users getting 403 Forbidden when trying to view their own 
+   service requests at /service-requests/{id}
+
+📁 FILE TO UPDATE:
+   serviceman.sekimbi.com/app/Http/Middleware/EnsureEmailIsVerified.php
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 FIND THIS SECTION (around line 30-41):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            $allowedRoutes = [
+                'logout',
+                'verification.verify',
+                'verification.resend',
+                'verification.send',
+                'profile',
+                'profile.client',
+                'profile.serviceman',
+                'profile.update',
+                'profile.client.update',
+                'profile.serviceman.update',
+            ];
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✏️ ADD THESE TWO LINES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            $allowedRoutes = [
+                'logout',
+                'verification.verify',
+                'verification.resend',
+                'verification.send',
+                'profile',
+                'profile.client',
+                'profile.serviceman',
+                'profile.update',
+                'profile.client.update',
+                'profile.serviceman.update',
+                // Service request viewing - users should be able to view their own requests
+                'service-requests.index',  // View all their service requests
+                'service-requests.show',   // View specific service request details
+            ];
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 STEPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Open cPanel File Manager
+2. Navigate to: serviceman.sekimbi.com/app/Http/Middleware/
+3. Edit: EnsureEmailIsVerified.php
+4. Find the $allowedRoutes array
+5. Add the two new lines (with comments) shown above
+6. Save the file
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ AFTER UPDATING:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Run this in cPanel Terminal (optional - clears cache):
+
+cd ~/serviceman.sekimbi.com
+php artisan optimize:clear
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 WHAT THIS FIXES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Users can now view their service requests list
+✅ Users can view individual service request details
+✅ No more 403 Forbidden errors
+✅ Users can still access their existing requests while unverified
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 NOTE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Users can VIEW their service requests but still need email 
+verification to CREATE new service requests.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

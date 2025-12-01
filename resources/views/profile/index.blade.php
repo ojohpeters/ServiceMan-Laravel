@@ -237,9 +237,10 @@
                             <p class="text-sm text-yellow-700 mb-3">
                                 Please verify your email address to access all features. Check your inbox at <strong>{{ $user->email }}</strong> for the verification link. If you didn't receive it or it expired, click the button below to resend.
                             </p>
-                            <form action="{{ route('verification.resend') }}" method="POST" id="resendVerificationForm">
+                            <form id="resendVerificationForm">
                                 @csrf
-                                <button type="submit" 
+                                <button type="button" 
+                                        onclick="resendVerificationEmail()"
                                         class="inline-flex items-center px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         id="resendVerificationBtn">
                                     <i class="fas fa-envelope mr-2"></i>
@@ -250,6 +251,7 @@
                                     </span>
                                 </button>
                             </form>
+                            <div id="resendMessage" class="mt-2 text-sm hidden"></div>
                         </div>
                     </div>
                 </div>
@@ -293,25 +295,86 @@ function cancelEdit() {
     document.getElementById('basicInfoForm').classList.add('hidden');
 }
 
-// Handle resend verification email with loading state
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('resendVerificationForm');
+// Handle resend verification email with AJAX
+function resendVerificationEmail() {
     const btn = document.getElementById('resendVerificationBtn');
     const text = document.getElementById('resendText');
     const loading = document.getElementById('resendLoading');
+    const messageDiv = document.getElementById('resendMessage');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     
-    if (form && btn) {
-        form.addEventListener('submit', function(e) {
-            // Show loading state immediately
-            btn.disabled = true;
-            if (text) text.classList.add('hidden');
-            if (loading) loading.classList.remove('hidden');
-            
-            // Let the form submit normally - Laravel will handle the response
-            // The loading state will be reset on page reload
-        });
+    // Show loading state
+    btn.disabled = true;
+    if (text) text.classList.add('hidden');
+    if (loading) loading.classList.remove('hidden');
+    if (messageDiv) {
+        messageDiv.classList.add('hidden');
+        messageDiv.innerHTML = '';
     }
-});
+    
+    // Make AJAX request
+    fetch('{{ route("verification.resend") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => {
+        // Check if response is ok
+        if (!response.ok) {
+            return response.json().then(err => Promise.reject(err));
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Response:', data);
+        
+        // Reset button state
+        btn.disabled = false;
+        if (text) text.classList.remove('hidden');
+        if (loading) loading.classList.add('hidden');
+        
+        // Show message
+        if (messageDiv) {
+            messageDiv.classList.remove('hidden');
+            if (data.message || data.success) {
+                messageDiv.className = 'mt-2 text-sm text-green-700 font-medium';
+                messageDiv.innerHTML = '<i class="fas fa-check-circle mr-1"></i>' + (data.message || data.success);
+            } else if (data.error) {
+                messageDiv.className = 'mt-2 text-sm text-red-700 font-medium';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle mr-1"></i>' + data.error;
+            } else {
+                messageDiv.className = 'mt-2 text-sm text-green-700 font-medium';
+                messageDiv.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Verification email sent! Please check your inbox.';
+            }
+        }
+        
+        // Scroll to message
+        if (messageDiv) {
+            messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    })
+    .catch(error => {
+        console.error('Error sending verification email:', error);
+        
+        // Reset button state
+        btn.disabled = false;
+        if (text) text.classList.remove('hidden');
+        if (loading) loading.classList.add('hidden');
+        
+        // Show error message
+        if (messageDiv) {
+            messageDiv.classList.remove('hidden');
+            messageDiv.className = 'mt-2 text-sm text-red-700 font-medium';
+            const errorMsg = (error && error.error) ? error.error : 'Failed to send email. Please check your email configuration or contact support.';
+            messageDiv.innerHTML = '<i class="fas fa-exclamation-circle mr-1"></i>' + errorMsg;
+        }
+    });
+}
 </script>
 @endpush
 @endsection
