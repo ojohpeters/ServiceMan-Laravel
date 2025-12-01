@@ -230,38 +230,40 @@
             </div>
             <div class="p-6">
                 @forelse($recentRequests as $request)
-                        <div class="group flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-all border-b border-gray-100 last:border-b-0">
-                            <div class="flex items-center space-x-4 flex-1">
+                        <div class="group flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-4 hover:bg-gray-50 rounded-xl transition-all border-b border-gray-100 last:border-b-0">
+                            <div class="flex items-start sm:items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
                                 <div class="flex-shrink-0">
-                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md">
+                                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md text-xs sm:text-sm">
                                         #{{ $request->id }}
                                     </div>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <h4 class="text-sm font-semibold text-gray-900 truncate">{{ $request->title }}</h4>
-                                    <p class="text-sm text-gray-600 flex items-center mt-1">
-                                        <i class="fas fa-tag text-gray-400 mr-2"></i>
-                                        {{ $request->category->name }}
+                                    <h4 class="text-sm font-semibold text-gray-900 truncate">{{ $request->category->name ?? 'Service Request' }}</h4>
+                                    <p class="text-xs sm:text-sm text-gray-600 flex items-center mt-1 truncate">
+                                        <i class="fas fa-tag text-gray-400 mr-1 sm:mr-2 text-xs"></i>
+                                        {{ $request->category->name ?? 'Service' }}
                                     </p>
                                     <p class="text-xs text-gray-500 flex items-center mt-1">
-                                        <i class="fas fa-clock text-gray-400 mr-2"></i>
+                                        <i class="fas fa-clock text-gray-400 mr-1 sm:mr-2"></i>
                                         {{ $request->created_at->diffForHumans() }}
                                     </p>
                                 </div>
-                        </div>
-                            <div class="flex items-center space-x-3">
-                                <span class="px-3 py-1.5 text-xs font-bold rounded-full shadow-sm
-                                    @if($request->status === 'PENDING') bg-yellow-100 text-yellow-800 border border-yellow-200
+                            </div>
+                            <div class="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-3 w-full sm:w-auto">
+                                <span class="px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-bold rounded-full shadow-sm whitespace-nowrap
+                                    @if($request->status === 'PENDING_ADMIN_ASSIGNMENT' || $request->status === 'PENDING') bg-yellow-100 text-yellow-800 border border-yellow-200
                                     @elseif($request->status === 'IN_PROGRESS') bg-blue-100 text-blue-800 border border-blue-200
                                     @elseif($request->status === 'COMPLETED') bg-green-100 text-green-800 border border-green-200
+                                    @elseif($request->status === 'SERVICEMAN_INSPECTED') bg-indigo-100 text-indigo-800 border border-indigo-200
+                                    @elseif($request->status === 'AWAITING_PAYMENT' || $request->status === 'PAYMENT_CONFIRMED') bg-green-100 text-green-800 border border-green-200
                                     @else bg-gray-100 text-gray-800 border border-gray-200 @endif">
-                                {{ ucfirst(str_replace('_', ' ', strtolower($request->status))) }}
-                            </span>
-                                <a href="{{ route('service-requests.show', $request) }}" class="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-lg transition-all">
+                                    {{ \App\Models\ServiceRequest::STATUS_CHOICES[$request->status] ?? ucfirst(str_replace('_', ' ', strtolower($request->status))) }}
+                                </span>
+                                <a href="{{ route('service-requests.show', $request) }}" class="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-lg transition-all flex-shrink-0">
                                     <i class="fas fa-arrow-right"></i>
-                            </a>
+                                </a>
+                            </div>
                         </div>
-                    </div>
                 @empty
                         <div class="text-center py-12">
                             <div class="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
