@@ -46,6 +46,12 @@ class AuthController extends Controller
 
         Auth::login($user);
 
+        // If email is not verified, redirect to profile page to show verification message
+        if (!$user->is_email_verified) {
+            return redirect()->route('profile')
+                ->with('error', 'Email verification required! Please verify your email address to access all features. Check your inbox for the verification link.');
+        }
+
         return redirect()->intended('/dashboard');
     }
 
@@ -242,7 +248,7 @@ class AuthController extends Controller
         $user = User::where('email_verification_token', $token)->first();
 
         if (!$user) {
-            return redirect('/login')->with('error', 'Invalid verification link.');
+            return redirect('/login')->with('error', 'Invalid or expired verification link. Please request a new one.');
         }
 
         if ($user->is_email_verified) {
@@ -256,6 +262,58 @@ class AuthController extends Controller
         ]);
 
         return redirect('/dashboard')->with('success', 'Email verified successfully! Welcome to ServiceMan!');
+    }
+
+    /**
+     * Resend verification email for authenticated users
+     */
+    public function resendVerificationEmail(Request $request)
+    {
+        $user = auth()->user();
+
+        // Check if user is authenticated
+        if (!$user) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Unauthorized'], 401);
+            }
+            return redirect('/login')->with('error', 'Please login to resend verification email.');
+        }
+
+        // Check if email is already verified
+        if ($user->is_email_verified) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Email is already verified'], 400);
+            }
+            return back()->with('info', 'Your email is already verified.');
+        }
+
+        // Generate new verification token (replaces old one if expired)
+        $verificationToken = \Illuminate\Support\Str::random(64);
+        $user->update([
+            'email_verification_token' => $verificationToken
+        ]);
+
+        // Send verification email
+        try {
+            $verificationUrl = url("/verify-email/{$verificationToken}");
+            Mail::to($user->email)->send(new \App\Mail\VerifyEmail($user, $verificationUrl));
+        } catch (\Exception $e) {
+            \Log::error('Failed to send verification email: ' . $e->getMessage());
+            
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Failed to send verification email. Please try again later.'], 500);
+            }
+            return back()->with('error', 'Failed to send verification email. Please try again later or contact support.');
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Verification email sent successfully! Please check your inbox.',
+                'email' => $user->email
+            ]);
+        }
+
+        return back()->with('success', 'Verification email sent successfully! Please check your inbox at ' . $user->email);
     }
 
     public function showPendingVerification()

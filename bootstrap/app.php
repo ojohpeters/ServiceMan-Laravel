@@ -18,8 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'approved' => \App\Http\Middleware\EnsureServicemanApproved::class,
         ]);
         
-        // Apply approval check to web routes
+        // Apply email verification to all authenticated web routes
+        // This ensures ALL users (clients and servicemen) must verify email before accessing the platform
         $middleware->web(append: [
+            \App\Http\Middleware\EnsureEmailIsVerified::class,
             \App\Http\Middleware\EnsureServicemanApproved::class,
         ]);
         

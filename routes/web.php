@@ -35,6 +35,9 @@ Route::get('/api/skills/common', [\App\Http\Controllers\Api\SkillsController::cl
 // Email verification route (can be accessed by anyone)
 Route::get('/verify-email/{token}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
 
+// Resend verification email (authenticated users only)
+Route::post('/resend-verification-email', [AuthController::class, 'resendVerificationEmail'])->name('verification.resend')->middleware('auth');
+
 // Pending verification page for unapproved servicemen
 Route::get('/pending-verification', [AuthController::class, 'showPendingVerification'])->name('pending-verification')->middleware('auth');
 

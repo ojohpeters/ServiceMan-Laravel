@@ -10,6 +10,34 @@
         <p class="text-gray-600">Manage your account information</p>
     </div>
 
+    <!-- Flash Messages -->
+    @if(session('success'))
+        <div class="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-check-circle text-green-400 mr-3"></i>
+                <p class="text-sm text-green-700">{{ session('success') }}</p>
+            </div>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle text-red-400 mr-3"></i>
+                <p class="text-sm text-red-700">{{ session('error') }}</p>
+            </div>
+        </div>
+    @endif
+
+    @if(session('info'))
+        <div class="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-info-circle text-blue-400 mr-3"></i>
+                <p class="text-sm text-blue-700">{{ session('info') }}</p>
+            </div>
+        </div>
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Profile Info -->
         <div class="lg:col-span-2 space-y-6">
@@ -195,6 +223,38 @@
                 </div>
             </div>
 
+            <!-- Email Verification Alert -->
+            @if(!$user->is_email_verified)
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg mb-6">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-yellow-400 text-xl"></i>
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <h3 class="text-sm font-medium text-yellow-800 mb-2">
+                                Email Verification Required
+                            </h3>
+                            <p class="text-sm text-yellow-700 mb-3">
+                                Please verify your email address to access all features. Check your inbox at <strong>{{ $user->email }}</strong> for the verification link. If you didn't receive it or it expired, click the button below to resend.
+                            </p>
+                            <form action="{{ route('verification.resend') }}" method="POST" id="resendVerificationForm">
+                                @csrf
+                                <button type="submit" 
+                                        class="inline-flex items-center px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        id="resendVerificationBtn">
+                                    <i class="fas fa-envelope mr-2"></i>
+                                    <span id="resendText">Resend Verification Email</span>
+                                    <span id="resendLoading" class="hidden">
+                                        <i class="fas fa-spinner fa-spin mr-2"></i>
+                                        Sending...
+                                    </span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Account Status -->
             <div class="bg-white shadow-sm rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Account Status</h3>
@@ -232,6 +292,26 @@ function cancelEdit() {
     document.getElementById('basicInfoView').classList.remove('hidden');
     document.getElementById('basicInfoForm').classList.add('hidden');
 }
+
+// Handle resend verification email with loading state
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('resendVerificationForm');
+    const btn = document.getElementById('resendVerificationBtn');
+    const text = document.getElementById('resendText');
+    const loading = document.getElementById('resendLoading');
+    
+    if (form && btn) {
+        form.addEventListener('submit', function(e) {
+            // Show loading state immediately
+            btn.disabled = true;
+            if (text) text.classList.add('hidden');
+            if (loading) loading.classList.remove('hidden');
+            
+            // Let the form submit normally - Laravel will handle the response
+            // The loading state will be reset on page reload
+        });
+    }
+});
 </script>
 @endpush
 @endsection
