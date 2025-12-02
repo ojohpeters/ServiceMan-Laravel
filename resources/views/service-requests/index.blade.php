@@ -202,7 +202,7 @@
                                     @endif
 
                                     <!-- Serviceman Info (for Admin & Client) -->
-                                    @if((auth()->user()->isAdmin() || auth()->user()->isClient()) && $request->serviceman)
+                                    @if((auth()->user()->isAdmin() || (auth()->user()->isClient() && $request->status !== 'PENDING_ADMIN_ASSIGNMENT')) && $request->serviceman)
                                         <div class="bg-white rounded-xl p-5 shadow-sm border border-green-100">
                                             <h4 class="text-sm font-bold text-gray-900 mb-3 flex items-center">
                                                 <i class="fas fa-user-tie mr-2 text-green-600"></i>
@@ -300,11 +300,11 @@
                                             @endif
                                         @endif
 
-                                        @if(auth()->user()->isServiceman() && $request->serviceman_id === auth()->id())
-                                            @if($request->status === 'ASSIGNED')
+                                        @if(auth()->user()->isServiceman() && ($request->serviceman_id === auth()->id() || $request->backup_serviceman_id === auth()->id()))
+                                            @if($request->status === 'ASSIGNED_TO_SERVICEMAN')
                                                 <a href="{{ route('service-requests.show', $request) }}" 
-                                                   class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg">
-                                                    <i class="fas fa-clipboard-check mr-2"></i>Submit Estimate
+                                                   class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg">
+                                                    <i class="fas fa-calculator mr-2"></i>Submit Estimate
                                                 </a>
                                             @elseif($request->status === 'IN_PROGRESS')
                                                 <a href="{{ route('service-requests.show', $request) }}" 

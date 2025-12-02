@@ -1,7 +1,7 @@
 <!-- Modern Booking Modal -->
-<div id="bookingModal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 p-4 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen py-8">
-        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-3xl transform transition-all animate-fadeIn my-8">
+<div id="bookingModal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 p-2 sm:p-4 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen py-4 sm:py-8">
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-3xl transform transition-all animate-fadeIn my-4 sm:my-8 max-h-[98vh] overflow-hidden flex flex-col">
         <!-- Header with Gradient -->
         <div class="bg-blue-600 px-6 sm:px-8 py-5 rounded-t-lg sticky top-0 z-10">
             <div class="flex justify-between items-center">
@@ -18,7 +18,7 @@
         </div>
 
         <!-- Modal Body -->
-        <form id="bookingForm" method="POST" action="{{ route('service-requests.store') }}" class="p-4 sm:p-6 md:p-8 max-h-[calc(100vh-200px)] overflow-y-auto">
+        <form id="bookingForm" method="POST" action="{{ route('service-requests.store') }}" class="p-4 sm:p-6 md:p-8 flex-1 overflow-y-auto">
             @csrf
             <input type="hidden" id="modalServicemanId" name="serviceman_id" value="">
             <input type="hidden" id="modalCategoryId" name="category_id" value="">
@@ -29,22 +29,22 @@
                     <i class="fas fa-user-tie mr-2 text-blue-600"></i>
                     Selected Professional
                 </h4>
-                <div class="flex items-start sm:items-center space-x-3 sm:space-x-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                     <img id="modalServicemanImage" 
                          src="" 
                          alt="Serviceman" 
-                         class="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-4 border-blue-200 shadow-lg flex-shrink-0">
-                    <div class="flex-1 min-w-0">
-                        <p class="font-bold text-base sm:text-lg text-gray-900 truncate" id="modalServicemanDetails">Loading...</p>
-                        <p class="text-xs sm:text-sm text-gray-600 flex items-center mt-1 truncate" id="modalServicemanCategory">
+                         class="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-4 border-blue-200 shadow-lg flex-shrink-0 mx-auto sm:mx-0">
+                    <div class="flex-1 min-w-0 text-center sm:text-left w-full sm:w-auto">
+                        <p class="font-bold text-base sm:text-lg text-gray-900 break-words sm:truncate" id="modalServicemanDetails">Loading...</p>
+                        <p class="text-xs sm:text-sm text-gray-600 flex items-center justify-center sm:justify-start mt-1 break-words sm:truncate" id="modalServicemanCategory">
                             <i class="fas fa-tools mr-2"></i>Category
                         </p>
-                        <div class="flex items-center mt-2 flex-wrap gap-2">
+                        <div class="flex flex-col sm:flex-row items-center sm:items-center justify-center sm:justify-start mt-2 gap-2 flex-wrap">
                             <div class="flex items-center">
                                 <div class="flex" id="modalServicemanRating">
                                     <!-- Stars will be inserted here -->
                                 </div>
-                                <span class="text-xs sm:text-sm text-gray-600 ml-2" id="modalServicemanStats">0 jobs</span>
+                                <span class="text-xs sm:text-sm text-gray-600 ml-2 whitespace-nowrap" id="modalServicemanStats">0 jobs</span>
                             </div>
                             <div id="modalAvailabilityStatus">
                                 <!-- Availability badge will be inserted here -->
@@ -151,8 +151,12 @@
                               name="client_address" 
                               rows="3" 
                               required
-                              placeholder="Enter complete address..."
+                              maxlength="500"
+                              placeholder="Enter complete address (max 500 characters)..."
                               class="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"></textarea>
+                    <p class="mt-1 text-xs text-gray-500">
+                        <span id="modal-address-char-count">0</span>/500 characters
+                    </p>
                 </div>
 
                 <!-- Service Description -->
@@ -165,8 +169,12 @@
                               name="service_description" 
                               rows="4" 
                               required
-                              placeholder="Describe the service you need in detail..."
+                              maxlength="1000"
+                              placeholder="Describe the service you need in detail (max 1000 characters)..."
                               class="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"></textarea>
+                    <p class="mt-1 text-xs text-gray-500">
+                        <span id="modal-description-char-count">0</span>/1000 characters
+                    </p>
                 </div>
             </div>
 
@@ -192,17 +200,17 @@
             </div>
 
             <!-- Modal Footer -->
-            <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t-2 border-gray-200">
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t-2 border-gray-200 sticky bottom-0 bg-white">
                 <button type="button" 
                         onclick="closeBookingModal()"
-                        class="flex-1 px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-all transform active:scale-95">
+                        class="w-full sm:flex-1 px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-all transform active:scale-95">
                     <i class="fas fa-times mr-2"></i>Cancel
                 </button>
                 <button type="submit"
                         id="modalSubmitButton"
-                        class="flex-1 px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors">
+                        class="w-full sm:flex-1 px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors">
                     <i class="fas fa-lock mr-2"></i>
-                    <span id="modalPayText">Proceed to Payment - ₦2,000</span>
+                    <span id="modalPayText" class="whitespace-nowrap">Proceed to Payment - ₦2,000</span>
                 </button>
             </div>
         </form>
@@ -430,6 +438,24 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target === this) {
                 closeBookingModal();
             }
+        });
+    }
+    
+    // Character count for address
+    const modalAddressField = document.getElementById('modalClientAddress');
+    const modalAddressCount = document.getElementById('modal-address-char-count');
+    if (modalAddressField && modalAddressCount) {
+        modalAddressField.addEventListener('input', function() {
+            modalAddressCount.textContent = this.value.length;
+        });
+    }
+    
+    // Character count for description
+    const modalDescriptionField = document.getElementById('modalServiceDescription');
+    const modalDescriptionCount = document.getElementById('modal-description-char-count');
+    if (modalDescriptionField && modalDescriptionCount) {
+        modalDescriptionField.addEventListener('input', function() {
+            modalDescriptionCount.textContent = this.value.length;
         });
     }
 });

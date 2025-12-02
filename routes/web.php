@@ -57,8 +57,8 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     
-    // Dashboard (requires email verification)
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('verified');
+    // Dashboard (requires email verification - handled by global middleware)
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     
     // Profile management
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile');
@@ -218,6 +218,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/negotiations/{negotiation}/handle', [AdminController::class, 'handleNegotiation'])->name('negotiations.handle');
         Route::get('/analytics', [AdminController::class, 'analytics'])->name('analytics');
         Route::get('/users', [AdminController::class, 'users'])->name('users');
+        Route::get('/servicemen', [AdminController::class, 'servicemen'])->name('servicemen');
         Route::post('/users/create-admin', [AdminController::class, 'createAdmin'])->name('users.create-admin');
         Route::get('/pending-servicemen', [AdminController::class, 'pendingServicemen'])->name('pending-servicemen');
         Route::post('/servicemen/{user}/assign-category', [AdminController::class, 'assignCategory'])->name('servicemen.assign-category');

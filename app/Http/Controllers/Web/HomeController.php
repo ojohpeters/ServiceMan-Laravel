@@ -14,15 +14,26 @@ class HomeController extends Controller
         $categories = Category::withCount('servicemen')->take(6)->get();
         
         // Get featured servicemen sorted by rating (highest to lowest)
+        // Use servicemanProfile->rating which is the calculated average rating
         $featuredServicemen = User::where('user_type', 'SERVICEMAN')
             ->with(['servicemanProfile.category', 'ratingsReceived'])
             ->whereHas('servicemanProfile', function($query) {
                 $query->where('is_available', true);
             })
             ->get()
+            ->map(function($serviceman) {
+                // Calculate average rating from actual ratings if profile rating is not set
+                $profileRating = $serviceman->servicemanProfile->rating ?? 0;
+                if ($profileRating == 0 && $serviceman->ratingsReceived->count() > 0) {
+                    $calculatedRating = $serviceman->ratingsReceived->avg('rating');
+                    $serviceman->servicemanProfile->rating = $calculatedRating ?? 0;
+                }
+                return $serviceman;
+            })
             ->sortByDesc(function($serviceman) {
                 return $serviceman->servicemanProfile->rating ?? 0;
             })
+            ->values() // Reset array keys after sorting
             ->take(8);
 
         // Get real testimonials (only featured ones approved by admin)

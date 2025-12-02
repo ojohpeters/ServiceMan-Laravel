@@ -57,6 +57,30 @@
                     </span>
                 </div>
             </div>
+            
+            @php
+                $isAssignedServiceman = auth()->user()->isServiceman() && 
+                    ((int)$serviceRequest->serviceman_id === (int)auth()->id() || ((int)$serviceRequest->backup_serviceman_id === (int)auth()->id() && $serviceRequest->backup_serviceman_id));
+            @endphp
+            @if($isAssignedServiceman && $serviceRequest->status === 'ASSIGNED_TO_SERVICEMAN')
+                <!-- Prominent Alert for Serviceman -->
+                <div class="mt-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-2xl p-6 border-l-4 border-yellow-400 animate-pulse">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-3">
+                                <i class="fas fa-exclamation-triangle text-yellow-400 text-2xl mr-3"></i>
+                                <h2 class="text-xl font-bold">Action Required: Submit Your Cost Estimate</h2>
+                            </div>
+                            <p class="text-blue-100 mb-4">
+                                You have been assigned to this job. Please review the service details and submit your cost estimate to proceed.
+                            </p>
+                            <button type="button" onclick="toggleEstimateForm()" class="bg-white text-blue-600 hover:bg-blue-50 font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
+                                <i class="fas fa-calculator mr-2"></i>Submit Estimate Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
 
         <div class="grid lg:grid-cols-3 gap-8">
@@ -258,7 +282,7 @@
                 @endif
 
                 <!-- Primary Serviceman Information (for Client & Admin) -->
-                @if($serviceRequest->serviceman && (auth()->user()->isClient() || auth()->user()->isAdmin()))
+                @if($serviceRequest->serviceman && (auth()->user()->isAdmin() || (auth()->user()->isClient() && $serviceRequest->status !== 'PENDING_ADMIN_ASSIGNMENT')))
                     <div class="bg-white shadow-lg rounded-2xl p-6 border-l-4 border-green-500">
                         <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
                             <i class="fas fa-user-tie mr-3 text-green-600 text-xl"></i>
@@ -466,20 +490,69 @@
                 @endif
 
                 <!-- Serviceman Actions -->
-                @if(auth()->user()->isServiceman() && $serviceRequest->serviceman_id === auth()->id())
-                    <div class="bg-white shadow-lg rounded-lg p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
+                @php
+                    $isAssignedServiceman = auth()->user()->isServiceman() && 
+                        ((int)$serviceRequest->serviceman_id === (int)auth()->id() || 
+                         ($serviceRequest->backup_serviceman_id && (int)$serviceRequest->backup_serviceman_id === (int)auth()->id()));
+                @endphp
+                @if($isAssignedServiceman)
+                    <div class="bg-white shadow-lg rounded-2xl p-6 border-l-4 border-blue-500">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-tools mr-2 text-blue-600"></i>
+                            Your Actions
+                        </h3>
                         <div class="space-y-3">
                             @if($serviceRequest->status === 'ASSIGNED_TO_SERVICEMAN')
-                                <button onclick="toggleEstimateForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                                    <i class="fas fa-calculator mr-2"></i>Submit Estimate
-                                </button>
-                            @endif
-
-                            @if($serviceRequest->status === 'IN_PROGRESS')
-                                <button onclick="toggleCompletionForm()" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                                    <i class="fas fa-check mr-2"></i>Mark as Completed
-                                </button>
+                                <div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-3 animate-pulse">
+                                    <p class="text-sm font-bold text-blue-900 mb-2 flex items-center">
+                                        <i class="fas fa-exclamation-circle mr-2 text-lg"></i>Action Required - Submit Your Estimate
+                                    </p>
+                                    <p class="text-sm text-blue-800 mb-4">You have been assigned to this job. Please inspect the location and submit your cost estimate to proceed.</p>
+                                    <button type="button" onclick="toggleEstimateForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg">
+                                        <i class="fas fa-calculator mr-2 text-xl"></i>Submit Inspection & Cost Estimate
+                                    </button>
+                                </div>
+                            @elseif($serviceRequest->status === 'PAYMENT_CONFIRMED')
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-3">
+                                    <p class="text-sm font-semibold text-yellow-900 mb-2">
+                                        <i class="fas fa-clock mr-2"></i>Waiting for Authorization
+                                    </p>
+                                    <p class="text-xs text-yellow-800">Payment has been confirmed. Waiting for admin to authorize work to begin.</p>
+                                </div>
+                            @elseif($serviceRequest->status === 'IN_PROGRESS')
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-3">
+                                    <p class="text-sm font-semibold text-green-900 mb-2">
+                                        <i class="fas fa-tools mr-2"></i>Work in Progress
+                                    </p>
+                                    <p class="text-xs text-green-800 mb-3">You're currently working on this service request. Mark it as completed when done.</p>
+                                    <button onclick="toggleCompletionForm()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md hover:shadow-lg">
+                                        <i class="fas fa-check-circle mr-2"></i>Mark Work as Completed
+                                    </button>
+                                </div>
+                            @elseif($serviceRequest->status === 'WORK_COMPLETED')
+                                <div class="bg-teal-50 border border-teal-200 rounded-lg p-4">
+                                    <p class="text-sm font-semibold text-teal-900 mb-2">
+                                        <i class="fas fa-check-double mr-2"></i>Work Completed
+                                    </p>
+                                    <p class="text-xs text-teal-800">Your work has been marked as completed. Waiting for admin verification.</p>
+                                </div>
+                            @else
+                                <div class="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
+                                    <p class="text-sm font-semibold text-yellow-900 mb-2">
+                                        <i class="fas fa-info-circle mr-2"></i>Current Status: {{ \App\Models\ServiceRequest::STATUS_CHOICES[$serviceRequest->status] ?? str_replace('_', ' ', $serviceRequest->status) }}
+                                    </p>
+                                    <p class="text-xs text-yellow-800">
+                                        @if($serviceRequest->status === 'PENDING_ADMIN_ASSIGNMENT')
+                                            This request is waiting for admin to assign a serviceman.
+                                        @elseif($serviceRequest->status === 'SERVICEMAN_INSPECTED')
+                                            You have already submitted your estimate. Waiting for admin to set final cost.
+                                        @elseif($serviceRequest->status === 'AWAITING_CLIENT_APPROVAL' || $serviceRequest->status === 'AWAITING_PAYMENT')
+                                            Waiting for client to approve and pay the final cost.
+                                        @else
+                                            No actions required at this time. Check back later for updates.
+                                        @endif
+                                    </p>
+                                </div>
                             @endif
                         </div>
                     </div>
@@ -689,32 +762,58 @@
 
 <!-- Negotiation Modal -->
 <!-- Estimate Modal -->
-<div id="estimateModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Submit Cost Estimate</h3>
+<div id="estimateModal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 overflow-y-auto p-4">
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-calculator mr-2 text-blue-600"></i>
+                    Submit Cost Estimate
+                </h3>
+                <button type="button" onclick="toggleEstimateForm()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
             <form action="{{ route('service-requests.submit-estimate', $serviceRequest) }}" method="POST">
                 @csrf
                 <div class="space-y-4">
                     <div>
-                        <label for="serviceman_estimated_cost" class="block text-sm font-medium text-gray-700 mb-2">Estimated Cost (₦)</label>
-                        <input type="number" id="serviceman_estimated_cost" name="serviceman_estimated_cost" required
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <label for="serviceman_estimated_cost" class="block text-sm font-semibold text-gray-900 mb-2">
+                            Estimated Cost (₦) <span class="text-red-500">*</span>
+                        </label>
+                        <input type="number" 
+                               id="serviceman_estimated_cost" 
+                               name="serviceman_estimated_cost" 
+                               required
+                               min="0"
+                               step="0.01"
+                               placeholder="Enter your cost estimate..."
+                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg font-semibold">
+                        <p class="mt-1 text-xs text-gray-500">Enter the total cost for this service</p>
                     </div>
                     <div>
-                        <label for="inspection_notes" class="block text-sm font-medium text-gray-700 mb-2">Inspection Notes</label>
-                        <textarea id="inspection_notes" name="inspection_notes" rows="3"
-                                  placeholder="Add any notes from your inspection..."
-                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                        <label for="inspection_notes" class="block text-sm font-semibold text-gray-900 mb-2">
+                            Inspection Notes <span class="text-gray-500">(Optional)</span>
+                        </label>
+                        <textarea id="inspection_notes" 
+                                  name="inspection_notes" 
+                                  rows="4"
+                                  maxlength="1000"
+                                  placeholder="Add any notes from your inspection (e.g., materials needed, time required, special conditions)..."
+                                  class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"></textarea>
+                        <p class="mt-1 text-xs text-gray-500">
+                            <span id="notes-char-count">0</span>/1000 characters
+                        </p>
                     </div>
-                    <div class="flex space-x-3">
-                        <button type="button" onclick="toggleEstimateForm()" 
-                                class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors">
-                            Cancel
+                    <div class="flex space-x-3 pt-4">
+                        <button type="button" 
+                                onclick="toggleEstimateForm()" 
+                                class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-4 rounded-lg transition-colors">
+                            <i class="fas fa-times mr-2"></i>Cancel
                         </button>
                         <button type="submit" 
-                                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-                            Submit Estimate
+                                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg hover:shadow-xl">
+                            <i class="fas fa-check mr-2"></i>Submit Estimate
                         </button>
                     </div>
                 </div>
@@ -938,9 +1037,32 @@ function toggleNegotiationForm() {
 function toggleEstimateForm() {
     const modal = document.getElementById('estimateModal');
     if (modal) {
-        modal.classList.toggle('hidden');
+        if (modal.classList.contains('hidden')) {
+            modal.classList.remove('hidden');
+            // Focus on the cost input when modal opens
+            setTimeout(() => {
+                const costInput = document.getElementById('serviceman_estimated_cost');
+                if (costInput) {
+                    costInput.focus();
+                }
+            }, 100);
+        } else {
+            modal.classList.add('hidden');
+        }
     }
 }
+
+// Character count for inspection notes
+document.addEventListener('DOMContentLoaded', function() {
+    const notesTextarea = document.getElementById('inspection_notes');
+    const notesCount = document.getElementById('notes-char-count');
+    
+    if (notesTextarea && notesCount) {
+        notesTextarea.addEventListener('input', function() {
+            notesCount.textContent = this.value.length;
+        });
+    }
+});
 
 function toggleCompletionForm() {
     const modal = document.getElementById('completionModal');

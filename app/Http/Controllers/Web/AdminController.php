@@ -410,6 +410,94 @@ class AdminController extends Controller
         return view('admin.users', compact('users'));
     }
 
+    public function servicemen(Request $request)
+    {
+        $query = User::where('user_type', 'SERVICEMAN')
+            ->with(['servicemanProfile.category', 'ratingsReceived']);
+
+        // Filter by category
+        if ($request->filled('category')) {
+            $query->whereHas('servicemanProfile', function($q) use ($request) {
+                $q->where('category_id', $request->category);
+            });
+        }
+
+        // Filter by approval status
+        if ($request->filled('approval_status')) {
+            if ($request->approval_status === 'approved') {
+                $query->where('is_approved', true);
+            } elseif ($request->approval_status === 'pending') {
+                $query->where('is_approved', false);
+            }
+        }
+
+        // Filter by availability
+        if ($request->filled('availability')) {
+            $availability = $request->availability === 'available';
+            $query->whereHas('servicemanProfile', function($q) use ($availability) {
+                $q->where('is_available', $availability);
+            });
+        }
+
+        // Filter by email verification
+        if ($request->filled('verified')) {
+            $verified = $request->verified === 'yes';
+            $query->where('is_email_verified', $verified);
+        }
+
+        // Search by name or email
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('username', 'like', "%{$search}%");
+            });
+        }
+
+        // Sort options
+        $sortBy = $request->get('sort_by', 'latest');
+        switch ($sortBy) {
+            case 'rating':
+                $query->whereHas('servicemanProfile', function($q) {
+                    $q->orderBy('rating', 'desc');
+                });
+                break;
+            case 'jobs':
+                $query->whereHas('servicemanProfile', function($q) {
+                    $q->orderBy('total_jobs_completed', 'desc');
+                });
+                break;
+            case 'name':
+                $query->orderBy('first_name')->orderBy('last_name');
+                break;
+            case 'latest':
+            default:
+                $query->latest();
+                break;
+        }
+
+        $servicemen = $query->paginate(20)->withQueryString();
+
+        // Get statistics
+        $stats = [
+            'total' => User::where('user_type', 'SERVICEMAN')->count(),
+            'approved' => User::where('user_type', 'SERVICEMAN')->where('is_approved', true)->count(),
+            'pending_approval' => User::where('user_type', 'SERVICEMAN')->where('is_approved', false)->count(),
+            'available' => User::where('user_type', 'SERVICEMAN')
+                ->whereHas('servicemanProfile', function($q) {
+                    $q->where('is_available', true);
+                })->count(),
+            'verified' => User::where('user_type', 'SERVICEMAN')->where('is_email_verified', true)->count(),
+        ];
+
+        // Get categories for filter dropdown
+        $categories = \App\Models\Category::orderBy('name')->get();
+
+        return view('admin.servicemen', compact('servicemen', 'stats', 'categories'));
+    }
+
     public function analytics()
     {
         $analytics = [

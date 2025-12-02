@@ -37,21 +37,25 @@ class AuthController extends Controller
             return back()->withErrors(['email' => 'Invalid credentials'])->withInput();
         }
 
-        // Check if serviceman is approved
-        if ($user->user_type === 'SERVICEMAN' && !$user->is_approved) {
-            // Login them to show the pending verification page
-            Auth::login($user);
-            return redirect()->route('pending-verification');
-        }
-
         Auth::login($user);
 
-        // If email is not verified, redirect to profile page to show verification message
+        // Priority 1: Check email verification first (applies to all users)
         if (!$user->is_email_verified) {
+            // For unapproved servicemen, they'll see both messages on profile page
+            if ($user->user_type === 'SERVICEMAN' && !$user->is_approved) {
+                return redirect()->route('pending-verification')
+                    ->with('warning', 'Please verify your email address. Check your inbox for the verification link.');
+            }
             return redirect()->route('profile')
                 ->with('error', 'Email verification required! Please verify your email address to access all features. Check your inbox for the verification link.');
         }
 
+        // Priority 2: Check serviceman approval (only after email is verified)
+        if ($user->user_type === 'SERVICEMAN' && !$user->is_approved) {
+            return redirect()->route('pending-verification');
+        }
+
+        // User is verified and (if serviceman) approved - go to dashboard
         return redirect()->intended('/dashboard');
     }
 
@@ -163,6 +167,12 @@ class AuthController extends Controller
             ]);
         } else {
             $message = 'Registration successful! Please check your email to verify your account.';
+        }
+
+        // Redirect to profile page for unverified users (instead of dashboard)
+        // This prevents redirect loops with the email verification middleware
+        if (!$user->is_email_verified) {
+            return redirect()->route('profile')->with('success', $message);
         }
 
         return redirect('/dashboard')->with('success', $message);
@@ -342,11 +352,34 @@ class AuthController extends Controller
 
     public function showPendingVerification()
     {
-        // Only show this page to unapproved servicemen
-        if (!auth()->check() || auth()->user()->user_type !== 'SERVICEMAN' || auth()->user()->is_approved) {
-            return redirect('/dashboard');
+        $user = auth()->user();
+        
+        // Must be authenticated
+        if (!$user) {
+            return redirect()->route('login');
         }
 
+        // If not a serviceman, redirect to appropriate page
+        if ($user->user_type !== 'SERVICEMAN') {
+            // Check email verification first
+            if (!$user->is_email_verified) {
+                return redirect()->route('profile')
+                    ->with('info', 'This page is only for servicemen awaiting approval.');
+            }
+            return redirect()->route('dashboard');
+        }
+
+        // If serviceman is already approved, redirect to dashboard
+        if ($user->is_approved) {
+            // Check email verification first
+            if (!$user->is_email_verified) {
+                return redirect()->route('profile')
+                    ->with('info', 'Your account is approved. Please verify your email to continue.');
+            }
+            return redirect()->route('dashboard');
+        }
+
+        // User is an unapproved serviceman - show pending page
         return view('auth.pending-verification');
     }
 }

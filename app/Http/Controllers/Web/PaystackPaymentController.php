@@ -259,6 +259,10 @@ class PaystackPaymentController extends Controller
                 }
 
                 // NOW create the service request after successful payment
+                // Truncate location to 255 chars (VARCHAR limit) - location is redundant but kept for compatibility
+                $location = mb_substr($pendingBooking['client_address'], 0, 255);
+                $title = mb_substr('Service Request - ' . $pendingBooking['category_name'], 0, 255);
+                
                 $serviceRequest = ServiceRequest::create([
                     'client_id' => $pendingBooking['client_id'],
                     'serviceman_id' => $pendingBooking['serviceman_id'],
@@ -270,11 +274,11 @@ class PaystackPaymentController extends Controller
                     'status' => 'PENDING_ADMIN_ASSIGNMENT',
                     'initial_booking_fee' => $pendingBooking['booking_fee'],
                     'admin_markup_percentage' => 10.00,
-                    'client_address' => $pendingBooking['client_address'],
-                    'service_description' => $pendingBooking['service_description'],
-                    'title' => 'Service Request - ' . $pendingBooking['category_name'],
-                    'description' => $pendingBooking['service_description'],
-                    'location' => $pendingBooking['client_address'],
+                    'client_address' => mb_substr($pendingBooking['client_address'], 0, 65535), // TEXT field limit
+                    'service_description' => mb_substr($pendingBooking['service_description'], 0, 65535), // TEXT field limit
+                    'title' => $title,
+                    'description' => mb_substr($pendingBooking['service_description'], 0, 65535), // TEXT field
+                    'location' => $location,
                 ]);
 
                 // Link payment to service request

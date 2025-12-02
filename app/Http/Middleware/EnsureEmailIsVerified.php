@@ -28,6 +28,19 @@ class EnsureEmailIsVerified
         if ($user && !$user->is_email_verified) {
             // Strictly allow ONLY these routes for unverified users
             $allowedRoutes = [
+                // Public pages - accessible to everyone (including unverified users)
+                'home',
+                'about',
+                'faq',
+                'contact',
+                'contact.submit',
+                'services',
+                'services.category',
+                'servicemen.show',
+                // Public API routes used by frontend
+                'api.categories.servicemen',
+                'api.skills.common',
+                // Authentication routes
                 'logout',
                 'verification.verify',
                 'verification.resend',  // Allow resending verification email
@@ -38,6 +51,7 @@ class EnsureEmailIsVerified
                 'profile.update',
                 'profile.client.update',
                 'profile.serviceman.update',
+                'pending-verification',  // Allow unapproved servicemen to see pending page
                 // Service request viewing - users should be able to view their own requests
                 'service-requests.index',  // View all their service requests
                 'service-requests.show',   // View specific service request details

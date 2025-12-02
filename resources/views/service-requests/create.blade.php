@@ -217,8 +217,12 @@
                                   name="client_address" 
                                   rows="3" 
                                   required
-                                  placeholder="Enter the complete address where service is needed..."
+                                  maxlength="500"
+                                  placeholder="Enter the complete address where service is needed (max 500 characters)..."
                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none">{{ old('client_address') }}</textarea>
+                        <p class="mt-1 text-xs text-gray-500">
+                            <span id="address-char-count">0</span>/500 characters
+                        </p>
                         @error('client_address')
                             <p class="mt-1 text-sm text-red-600 flex items-center">
                                 <i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}
@@ -236,8 +240,12 @@
                                   name="service_description" 
                                   rows="5" 
                                   required
-                                  placeholder="Describe the service you need in detail (e.g., leaking pipe in bathroom, electrical outlet not working, etc.)..."
+                                  maxlength="1000"
+                                  placeholder="Describe the service you need in detail (e.g., leaking pipe in bathroom, electrical outlet not working, etc.) - max 1000 characters..."
                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none">{{ old('service_description') }}</textarea>
+                        <p class="mt-1 text-xs text-gray-500">
+                            <span id="description-char-count">0</span>/1000 characters
+                        </p>
                         @error('service_description')
                             <p class="mt-1 text-sm text-red-600 flex items-center">
                                 <i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}
@@ -424,6 +432,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initial fee calculation
     updateBookingFee();
+    
+    // Character count for address
+    const addressField = document.getElementById('client_address');
+    const addressCount = document.getElementById('address-char-count');
+    if (addressField && addressCount) {
+        addressField.addEventListener('input', function() {
+            addressCount.textContent = this.value.length;
+        });
+        // Set initial count
+        if (addressField.value) {
+            addressCount.textContent = addressField.value.length;
+        }
+    }
+    
+    // Character count for description
+    const descriptionField = document.getElementById('service_description');
+    const descriptionCount = document.getElementById('description-char-count');
+    if (descriptionField && descriptionCount) {
+        descriptionField.addEventListener('input', function() {
+            descriptionCount.textContent = this.value.length;
+        });
+        // Set initial count
+        if (descriptionField.value) {
+            descriptionCount.textContent = descriptionField.value.length;
+        }
+    }
 });
 </script>
 @endsection

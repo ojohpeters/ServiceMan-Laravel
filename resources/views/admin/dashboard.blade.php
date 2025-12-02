@@ -117,6 +117,18 @@
                         </div>
                     </a>
                     
+                    <!-- Manage Servicemen -->
+                    <a href="{{ route('admin.servicemen') }}" 
+                       class="group flex items-center p-5 bg-gradient-to-br from-indigo-50 to-indigo-100 hover:from-indigo-100 hover:to-indigo-200 rounded-2xl border-2 border-indigo-200 hover:border-indigo-300 transition-all transform hover:scale-105 shadow-md hover:shadow-lg">
+                        <div class="bg-gradient-to-br from-indigo-600 to-indigo-700 p-4 rounded-xl mr-4 group-hover:scale-110 transition-transform shadow-lg">
+                            <i class="fas fa-tools text-white text-2xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <span class="text-sm font-bold text-gray-900 block">Manage Servicemen</span>
+                            <span class="text-xs text-gray-600">Filter & manage service providers</span>
+                        </div>
+                    </a>
+                    
                     <!-- Manage Testimonials -->
                     <a href="{{ route('admin.testimonials') }}" 
                        class="group flex items-center p-5 bg-gradient-to-br from-yellow-50 to-yellow-100 hover:from-yellow-100 hover:to-yellow-200 rounded-2xl border-2 border-yellow-200 hover:border-yellow-300 transition-all transform hover:scale-105 shadow-md hover:shadow-lg">

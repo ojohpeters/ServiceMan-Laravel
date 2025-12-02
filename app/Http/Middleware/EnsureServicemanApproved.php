@@ -19,10 +19,41 @@ class EnsureServicemanApproved
         if ($request->user()) {
             // If user is a serviceman and not approved
             if ($request->user()->user_type === 'SERVICEMAN' && !$request->user()->is_approved) {
-                // Allow access to pending verification page, logout, and profile edit
-                $allowedRoutes = ['pending-verification', 'logout', 'profile.serviceman', 'profile.serviceman.update'];
+                // Allow access to public pages, pending verification page, logout, and profile edit
+                $allowedRoutes = [
+                    // Public pages - accessible to everyone
+                    'home',
+                    'about',
+                    'faq',
+                    'contact',
+                    'contact.submit',
+                    'services',
+                    'services.category',
+                    'servicemen.show',
+                    // Public API routes
+                    'api.categories.servicemen',
+                    'api.skills.common',
+                    // Authentication and profile routes
+                    'pending-verification',
+                    'logout',
+                    'profile',
+                    'profile.client',
+                    'profile.serviceman',
+                    'profile.update',
+                    'profile.client.update',
+                    'profile.serviceman.update',
+                    // Email verification routes
+                    'verification.verify',
+                    'verification.resend',
+                    'verification.send',
+                    // Service request viewing
+                    'service-requests.index',
+                    'service-requests.show',
+                ];
                 
-                if (!in_array($request->route()->getName(), $allowedRoutes)) {
+                $routeName = $request->route()?->getName();
+                
+                if (!in_array($routeName, $allowedRoutes)) {
                     return redirect()->route('pending-verification');
                 }
             }

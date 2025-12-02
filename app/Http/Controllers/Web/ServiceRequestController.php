@@ -324,9 +324,17 @@ class ServiceRequestController extends Controller
 
     public function submitEstimate(Request $request, ServiceRequest $serviceRequest)
     {
-        // Only assigned serviceman can submit estimate
-        if ($serviceRequest->serviceman_id !== Auth::id()) {
-            abort(403);
+        // Only assigned serviceman (primary or backup) can submit estimate
+        $user = Auth::user();
+        if (!$user->isServiceman()) {
+            abort(403, 'Only servicemen can submit estimates.');
+        }
+        
+        $isPrimary = (int)$serviceRequest->serviceman_id === (int)$user->id;
+        $isBackup = $serviceRequest->backup_serviceman_id && (int)$serviceRequest->backup_serviceman_id === (int)$user->id;
+        
+        if (!$isPrimary && !$isBackup) {
+            abort(403, 'You are not assigned to this service request.');
         }
 
         $validator = Validator::make($request->all(), [

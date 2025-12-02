@@ -4,6 +4,91 @@
 
 @section('content')
 <div class="max-w-4xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
+    <!-- Admin Controls (Only visible to admins) -->
+    @auth
+        @if(auth()->user()->isAdmin())
+            <div class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 flex items-center">
+                            <i class="fas fa-shield-alt text-red-600 mr-2"></i>
+                            Admin Controls
+                        </h3>
+                        <div class="flex flex-wrap gap-3">
+                            <!-- Approval Status -->
+                            @if($user->is_approved)
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                                    <i class="fas fa-check-circle mr-2"></i>Approved
+                                </span>
+                            @else
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
+                                    <i class="fas fa-clock mr-2"></i>Pending Approval
+                                </span>
+                            @endif
+                            
+                            <!-- Email Verification Status -->
+                            @if($user->is_email_verified)
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+                                    <i class="fas fa-envelope-check mr-2"></i>Email Verified
+                                </span>
+                            @else
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-800">
+                                    <i class="fas fa-envelope-times mr-2"></i>Email Not Verified
+                                </span>
+                            @endif
+                            
+                            <!-- Category Status -->
+                            @if($user->servicemanProfile->category)
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-800">
+                                    <i class="fas fa-tag mr-2"></i>{{ $user->servicemanProfile->category->name }}
+                                </span>
+                            @else
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-800">
+                                    <i class="fas fa-exclamation-triangle mr-2"></i>No Category Assigned
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3 flex-wrap">
+                        @if($user->is_approved)
+                            <form method="POST" action="{{ route('admin.servicemen.revoke-approval', $user) }}" 
+                                  onsubmit="return confirm('Are you sure you want to REVOKE approval for {{ $user->full_name }}? They will be immediately logged out and unable to login until re-approved.');">
+                                @csrf
+                                <button type="submit" 
+                                        class="inline-flex items-center px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg">
+                                    <i class="fas fa-user-times mr-2"></i>Revoke Approval
+                                </button>
+                            </form>
+                        @else
+                            <form method="POST" action="{{ route('admin.servicemen.approve', $user) }}" 
+                                  onsubmit="return confirm('Are you sure you want to APPROVE {{ $user->full_name }}? They will be able to login and accept jobs.');">
+                                @csrf
+                                <button type="submit" 
+                                        class="inline-flex items-center px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg">
+                                    <i class="fas fa-user-check mr-2"></i>Approve Serviceman
+                                </button>
+                            </form>
+                        @endif
+                        
+                        @if(!$user->servicemanProfile->category)
+                            <a href="{{ route('admin.pending-servicemen') }}" 
+                               class="inline-flex items-center px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg">
+                                <i class="fas fa-tag mr-2"></i>Assign Category
+                            </a>
+                        @endif
+                        
+                        <a href="{{ route('admin.servicemen') }}" 
+                           class="inline-flex items-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg">
+                            <i class="fas fa-arrow-left mr-2"></i>Back to Servicemen
+                        </a>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endauth
+    
     <!-- Profile Header -->
     <div class="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:p-8 mb-6">
         <div class="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
@@ -49,7 +134,21 @@
             <!-- Action Button - Full width on mobile, positioned on desktop -->
             <div class="w-full lg:w-auto lg:flex-shrink-0 lg:text-right mt-4 lg:mt-0">
             @auth
-                @if(auth()->user()->isClient())
+                @if(auth()->user()->isAdmin())
+                    <!-- Admin viewing - show quick actions -->
+                    <div class="flex flex-col gap-2">
+                        @if($user->is_approved)
+                            <span class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-semibold">
+                                <i class="fas fa-check-circle mr-2"></i>Approved
+                            </span>
+                        @else
+                            <span class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-semibold">
+                                <i class="fas fa-clock mr-2"></i>Pending Approval
+                            </span>
+                        @endif
+                        <p class="text-xs text-gray-500 text-center">Use admin controls above for actions</p>
+                    </div>
+                @elseif(auth()->user()->isClient())
                     @if($user->servicemanProfile->is_available)
                         <a href="{{ route('service-requests.create') }}?serviceman_id={{ $user->id }}" 
                            class="w-full sm:w-auto block sm:inline-block text-center bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg whitespace-nowrap">

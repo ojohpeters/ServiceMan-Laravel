@@ -333,21 +333,30 @@
                         <h3 class="text-lg font-bold text-gray-900 mb-1">{{ $serviceman->full_name }}</h3>
                         <p class="text-sm text-gray-600 mb-3">{{ $serviceman->servicemanProfile->category->name ?? 'Professional' }}</p>
                         
-                        @if($serviceman->ratingsReceived->count() > 0)
+                        @php
+                            // Use profile rating which is already calculated, fallback to avg from ratings
+                            $profileRating = $serviceman->servicemanProfile->rating ?? 0;
+                            if ($profileRating == 0 && $serviceman->ratingsReceived->count() > 0) {
+                                $profileRating = $serviceman->ratingsReceived->avg('rating');
+                            }
+                            $displayRating = number_format($profileRating, 1);
+                            
+                            // Get real job count from servicemanProfile
+                            $jobCount = $serviceman->servicemanProfile->total_jobs_completed ?? 0;
+                        @endphp
+                        
+                        @if($profileRating > 0)
                             <div class="flex items-center justify-center mb-3">
-                                @php
-                                    $avgRating = $serviceman->ratingsReceived->avg('rating');
-                                @endphp
                                 @for($i = 1; $i <= 5; $i++)
-                                    <i class="fas fa-star {{ $i <= $avgRating ? 'text-yellow-400' : 'text-gray-300' }} text-sm"></i>
+                                    <i class="fas fa-star {{ $i <= $profileRating ? 'text-yellow-400' : 'text-gray-300' }} text-sm"></i>
                                 @endfor
-                                <span class="ml-2 text-sm text-gray-600 font-semibold">({{ number_format($avgRating, 1) }})</span>
+                                <span class="ml-2 text-sm text-gray-600 font-semibold">({{ $displayRating }})</span>
                             </div>
                         @endif
                         
                         <div class="text-sm text-gray-600 mb-4">
                             <i class="fas fa-briefcase mr-1 text-blue-600"></i>
-                            {{ $serviceman->servicemanProfile->total_jobs_completed ?? 0 }} Jobs
+                            {{ number_format($jobCount) }} {{ $jobCount == 1 ? 'Job' : 'Jobs' }}
                         </div>
                         
                         <a href="{{ route('servicemen.show', $serviceman) }}" 
