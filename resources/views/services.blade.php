@@ -38,29 +38,21 @@
                     </div>
                 </div>
 
-                <!-- Filter Buttons -->
-                <div class="flex flex-wrap gap-2">
-                    <button 
-                        @click="filterBy = 'all'; filterCategories()"
-                        :class="filterBy === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
-                        class="px-4 py-2 rounded-lg font-medium transition-colors"
+                <!-- Category Filter Dropdown -->
+                <div class="relative">
+                    <select 
+                        x-model="selectedCategory"
+                        @change="filterCategories()"
+                        class="appearance-none w-full md:w-64 pl-4 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer"
                     >
-                        All Services
-                    </button>
-                    <button 
-                        @click="filterBy = 'popular'; filterCategories()"
-                        :class="filterBy === 'popular' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
-                        class="px-4 py-2 rounded-lg font-medium transition-colors"
-                    >
-                        Popular
-                    </button>
-                    <button 
-                        @click="filterBy = 'emergency'; filterCategories()"
-                        :class="filterBy === 'emergency' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
-                        class="px-4 py-2 rounded-lg font-medium transition-colors"
-                    >
-                        Emergency
-                    </button>
+                        <option value="">All Categories</option>
+                        <template x-for="category in categories" :key="category.id">
+                            <option :value="category.id" x-text="category.name"></option>
+                        </template>
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <i class="fas fa-chevron-down text-gray-400"></i>
+                    </div>
                 </div>
             </div>
         </div>
@@ -93,11 +85,11 @@
                             <div class="flex items-center justify-between mb-4">
                                 <div class="flex items-center text-sm text-gray-500">
                                     <i class="fas fa-user-friends mr-2"></i>
-                                    <span x-text="category.servicemen_count || '0'">0</span> professionals
+                                    <span x-text="formatCount(category.servicemen_count || 0)"></span> professionals
                                 </div>
                                 <div class="flex items-center text-sm text-gray-500">
                                     <i class="fas fa-star mr-2 text-yellow-500"></i>
-                                    <span x-text="category.average_rating || '4.8'">4.8</span>
+                                    <span x-text="(category.average_rating || 0).toFixed(1)"></span>
                                 </div>
                             </div>
 
@@ -223,21 +215,21 @@
         </div>
     </section>
 
-    <!-- Custom Service Request Section -->
+    <!-- Contact Us Section (Service Not Found) -->
     <section class="py-16 bg-gray-50">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <div class="bg-white rounded-2xl shadow-lg p-8 sm:p-12">
                 <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <i class="fas fa-lightbulb text-blue-600 text-3xl"></i>
+                    <i class="fas fa-headset text-blue-600 text-3xl"></i>
                 </div>
                 <h2 class="text-3xl font-bold text-gray-900 mb-4">Don't See What You're Looking For?</h2>
                 <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                    Need a service that's not listed? Request a custom service and we'll connect you with the right professional for your specific needs.
+                    Can't find the service you need? Contact us and our team will help you find the right professional for your specific needs.
                 </p>
                 <a href="{{ route('contact') }}" 
                    class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg text-lg font-bold transition-colors shadow-lg">
                     <i class="fas fa-envelope mr-2"></i>
-                    Request a Custom Service
+                    Contact Us
                 </a>
             </div>
         </div>
@@ -252,7 +244,7 @@ function servicesPage() {
         filteredCategories: [],
         loading: true,
         searchQuery: '',
-        filterBy: 'all',
+        selectedCategory: '',
 
         async loadCategories() {
             try {
@@ -336,16 +328,18 @@ function servicesPage() {
                 );
             }
 
-            // Apply category filter
-            if (this.filterBy === 'popular') {
-                filtered = filtered.filter(category => category.average_rating >= 4.7);
-            } else if (this.filterBy === 'emergency') {
-                // For demo purposes, mark some categories as emergency
-                const emergencyCategories = ['Electrical Services', 'Plumbing', 'HVAC Services'];
-                filtered = filtered.filter(category => emergencyCategories.includes(category.name));
+            // Apply category dropdown filter
+            if (this.selectedCategory) {
+                filtered = filtered.filter(category => category.id == this.selectedCategory);
             }
 
             this.filteredCategories = filtered;
+        },
+
+        formatCount(count) {
+            // Ensure count is a number and format it properly
+            const num = parseInt(count) || 0;
+            return num.toString();
         },
 
         getCategoryIcon(categoryName) {

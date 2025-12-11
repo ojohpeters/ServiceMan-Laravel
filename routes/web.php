@@ -26,11 +26,13 @@ Route::post('/contact', [HomeController::class, 'contact'])->name('contact.submi
 Route::get('/services', [CategoryController::class, 'index'])->name('services');
 Route::get('/services/{category}', [CategoryController::class, 'show'])->name('services.category');
 Route::get('/servicemen/{user}', [ProfileController::class, 'showPublic'])->name('servicemen.show');
+Route::get('/servicemen/{serviceman}/calendar', [\App\Http\Controllers\AvailabilityController::class, 'getCalendar'])->name('servicemen.calendar');
 
 
 // API routes for AJAX
 Route::get('/api/categories/{category}/servicemen', [CategoryController::class, 'getServicemen'])->name('api.categories.servicemen');
 Route::get('/api/skills/common', [\App\Http\Controllers\Api\SkillsController::class, 'getCommonSkills'])->name('api.skills.common');
+Route::get('/api/servicemen/{servicemanId}/check-availability', [\App\Http\Controllers\AvailabilityController::class, 'checkAvailability'])->name('api.servicemen.check-availability');
 
 // Email verification route (can be accessed by anyone)
 Route::get('/verify-email/{token}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
@@ -77,6 +79,8 @@ Route::middleware('auth')->group(function () {
       Route::get('/service-requests/{serviceRequest}', [ServiceRequestController::class, 'show'])->name('service-requests.show');
       Route::get('/service-requests/{serviceRequest}/edit', [ServiceRequestController::class, 'edit'])->name('service-requests.edit');
       Route::put('/service-requests/{serviceRequest}', [ServiceRequestController::class, 'update'])->name('service-requests.update');
+      Route::post('/service-requests/{serviceRequest}/accept', [ServiceRequestController::class, 'acceptAssignment'])->name('service-requests.accept');
+      Route::post('/service-requests/{serviceRequest}/decline', [ServiceRequestController::class, 'declineAssignment'])->name('service-requests.decline');
       Route::post('/service-requests/{serviceRequest}/submit-estimate', [ServiceRequestController::class, 'submitEstimate'])->name('service-requests.submit-estimate');
       Route::post('/service-requests/{serviceRequest}/mark-complete', [ServiceRequestController::class, 'markComplete'])->name('service-requests.mark-complete');
       Route::post('/service-requests/{serviceRequest}/accept-cost', [ServiceRequestController::class, 'acceptCost'])->name('service-requests.accept-cost');
@@ -198,6 +202,14 @@ Route::middleware('auth')->group(function () {
         return $controller->getServicemen($category);
     });
     
+    // Availability routes (for servicemen)
+    Route::middleware('verified')->group(function () {
+        Route::get('/availability', [\App\Http\Controllers\AvailabilityController::class, 'index'])->name('availability.index');
+        Route::post('/availability', [\App\Http\Controllers\AvailabilityController::class, 'store'])->name('availability.store');
+        Route::post('/availability/bulk-update', [\App\Http\Controllers\AvailabilityController::class, 'bulkUpdate'])->name('availability.bulk-update');
+        Route::delete('/availability/{id}', [\App\Http\Controllers\AvailabilityController::class, 'destroy'])->name('availability.destroy');
+    });
+    
     // Admin routes
     Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
@@ -208,6 +220,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/categories/{category}', [AdminController::class, 'destroyCategory'])->name('categories.destroy');
         Route::get('/service-requests', [AdminController::class, 'serviceRequests'])->name('service-requests');
         Route::post('/service-requests/{serviceRequest}/assign-serviceman', [AdminController::class, 'assignServiceman'])->name('service-requests.assign-serviceman');
+        Route::post('/service-requests/{serviceRequest}/change-serviceman', [AdminController::class, 'changeServiceman'])->name('service-requests.change-serviceman');
         Route::post('/service-requests/{serviceRequest}/submit-cost-estimate', [AdminController::class, 'submitCostEstimate'])->name('service-requests.submit-cost-estimate');
         Route::post('/service-requests/{serviceRequest}/approve-cost-estimate', [AdminController::class, 'approveCostEstimate'])->name('service-requests.approve-cost-estimate');
         Route::post('/service-requests/{serviceRequest}/mark-work-completed', [AdminController::class, 'markWorkCompleted'])->name('service-requests.mark-work-completed');
@@ -219,6 +232,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/analytics', [AdminController::class, 'analytics'])->name('analytics');
         Route::get('/users', [AdminController::class, 'users'])->name('users');
         Route::get('/servicemen', [AdminController::class, 'servicemen'])->name('servicemen');
+        Route::get('/queue-status', function() {
+            if (!auth()->user()->isAdmin()) abort(403);
+            
+            return response()->json([
+                'pending_jobs' => \DB::table('jobs')->count(),
+                'failed_jobs' => \DB::table('failed_jobs')->count(),
+                'last_processed' => \Cache::get('queue_last_processed', 'Never'),
+                'status' => 'ok'
+            ]);
+        })->name('admin.queue-status');
         Route::post('/users/create-admin', [AdminController::class, 'createAdmin'])->name('users.create-admin');
         Route::get('/pending-servicemen', [AdminController::class, 'pendingServicemen'])->name('pending-servicemen');
         Route::post('/servicemen/{user}/assign-category', [AdminController::class, 'assignCategory'])->name('servicemen.assign-category');
@@ -236,5 +259,10 @@ Route::middleware('auth')->group(function () {
         // Testimonials Management Routes
         Route::get('/testimonials', [AdminController::class, 'testimonials'])->name('testimonials');
         Route::post('/testimonials/{rating}/toggle-featured', [AdminController::class, 'toggleTestimonialFeatured'])->name('testimonials.toggle-featured');
+        
+        // Log Viewer Routes
+        Route::get('/logs', [\App\Http\Controllers\Web\LogController::class, 'index'])->name('logs');
+        Route::delete('/logs', [\App\Http\Controllers\Web\LogController::class, 'clear'])->name('logs.clear');
+        Route::get('/logs/download', [\App\Http\Controllers\Web\LogController::class, 'download'])->name('logs.download');
     });
 });

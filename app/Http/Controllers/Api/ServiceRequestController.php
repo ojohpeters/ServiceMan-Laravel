@@ -83,6 +83,16 @@ class ServiceRequestController extends Controller
         }
 
         $bookingDate = Carbon::parse($request->booking_date);
+        
+        // Check if serviceman is busy on the booking date
+        if ($serviceman->isBusyOnDate($bookingDate)) {
+            $dateFormatted = $bookingDate->format('l, F j, Y');
+            return response()->json([
+                'error' => "⚠️ WARNING: This serviceman is marked as BUSY/UNAVAILABLE on {$dateFormatted}. Please select a different date.",
+                'busy_date' => $bookingDate->format('Y-m-d')
+            ], 400);
+        }
+        
         $isEmergency = $request->boolean('is_emergency') || $bookingDate->diffInDays(Carbon::today()) < 2;
         $autoFlaggedEmergency = $bookingDate->diffInDays(Carbon::today()) < 2;
 

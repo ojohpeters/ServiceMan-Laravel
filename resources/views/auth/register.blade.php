@@ -2,6 +2,25 @@
 
 @section('title', 'Register - ServiceMan')
 
+@push('styles')
+<style>
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+    
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-out;
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-2xl w-full">
@@ -185,20 +204,13 @@
                                 </div>
                 </div>
 
-                            <!-- Custom Category Input -->
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <p class="text-xs font-semibold text-blue-900 mb-2">
-                                    <i class="fas fa-lightbulb mr-1"></i>Or enter a custom category:
+                            <!-- Category Not Found Notice -->
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <p class="text-xs font-semibold text-yellow-900 mb-2">
+                                    <i class="fas fa-info-circle mr-1"></i>Don't see your service category?
                                 </p>
-                                <input type="text" 
-                                       id="custom_category" 
-                                       name="custom_category" 
-                                       value="{{ old('custom_category') }}"
-                                       placeholder="e.g., HVAC, Locksmith, Tiling, etc."
-                                       class="w-full px-4 py-2 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                                <p class="mt-2 text-xs text-gray-600">
-                                    <i class="fas fa-info-circle mr-1"></i>
-                                    <strong>Don't see your category above?</strong> Type it here and admin will review it. You can also skip entirely and admin will assign you later.
+                                <p class="text-xs text-gray-700">
+                                    If your service category is not listed above, please <strong>select "Other"</strong> if available, or contact us after registration. Admin will review your profile and assign the appropriate category.
                                 </p>
                             </div>
                 </div>
@@ -228,18 +240,43 @@
 
                                 <!-- Custom Skills -->
                     <div>
-                                    <input id="custom_skills" 
-                                           type="text" 
-                                           class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-sm"
-                                           placeholder="Add custom skills (comma separated)">
-                                    <p class="text-xs text-gray-500 mt-1">e.g., Solar panel installation, Smart home setup</p>
+                                    <div class="relative">
+                                        <input id="custom_skills" 
+                                               type="text" 
+                                               onkeydown="if(event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); if(this.value.trim()) addCustomSkills(); return false; }"
+                                               class="appearance-none block w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-sm"
+                                               placeholder="Type skills separated by comma">
+                                        <button type="button" 
+                                                id="addSkillsBtn"
+                                                onclick="event.preventDefault(); event.stopPropagation(); addCustomSkills(); return false;"
+                                                disabled
+                                                class="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-lg transition-all focus:outline-none opacity-30 cursor-not-allowed"
+                                                style="pointer-events: none;"
+                                                title="Type skills to enable">
+                                            <i class="fas fa-check-circle text-xl text-purple-600"></i>
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        e.g., Solar panel installation, Smart home setup, Water heater repair
+                                        <span class="text-purple-600 font-semibold">Press Enter or click the ✓ button to add</span>
+                                    </p>
                     </div>
 
                                 <!-- Hidden field for final skills -->
                                 <input type="hidden" id="skills" name="skills" value="{{ old('skills') }}">
 
                                 <!-- Selected Skills Display -->
-                                <div id="selectedSkills" class="flex flex-wrap gap-2 min-h-[40px] bg-white rounded-lg p-3 border border-gray-200"></div>
+                                <div id="selectedSkills" class="flex flex-wrap gap-2 min-h-[60px] bg-white rounded-lg p-3 border-2 border-gray-200 mt-2">
+                                    <p class="text-sm text-gray-400 italic w-full">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        Your skills will appear here as tags when you press Enter
+                                    </p>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    <i class="fas fa-lightbulb mr-1 text-yellow-500"></i>
+                                    <strong>Tip:</strong> Type skills like "Electrical wiring, Troubleshooting, Panel installation" and press Enter
+                                </p>
                     </div>
                 </div>
 
@@ -310,6 +347,18 @@
 let selectedSkillsSet = new Set();
 let allAvailableSkills = [];
 
+// Prevent form submission when adding skills
+function handleFormSubmit(e) {
+    // Check if skills input is focused and has value - if so, add skills instead of submitting
+    const customInput = document.getElementById('custom_skills');
+    if (customInput && document.activeElement === customInput && customInput.value.trim()) {
+        e.preventDefault();
+        addCustomSkills();
+        return false;
+    }
+    return true;
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     toggleUserTypeFields();
@@ -317,30 +366,125 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load old skills if any
     const oldSkills = "{{ old('skills') }}";
-    if (oldSkills) {
+    if (oldSkills && oldSkills.trim()) {
         oldSkills.split(',').forEach(skill => {
-            if (skill.trim()) {
-                selectedSkillsSet.add(skill.trim());
+            const trimmedSkill = skill.trim();
+            if (trimmedSkill) {
+                selectedSkillsSet.add(trimmedSkill);
             }
         });
+        updateSelectedSkills();
+    } else {
+        // Initialize empty display
         updateSelectedSkills();
     }
     
     // Category change listener
-    document.getElementById('category_id').addEventListener('change', function() {
-        fetchAndLoadSkills();
-    });
+    const categoryField = document.getElementById('category_id');
+    if (categoryField) {
+        categoryField.addEventListener('change', function() {
+            fetchAndLoadSkills();
+        });
+    }
     
-    // Custom skills input listener
-    document.getElementById('custom_skills').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
+    // Setup custom skills input listeners after a short delay to ensure element exists
+    setTimeout(function() {
+        setupCustomSkillsInput();
+    }, 100);
+    
+    // Also setup when serviceman fields are shown
+    const servicemanRadio = document.querySelector('input[name="user_type"][value="SERVICEMAN"]');
+    if (servicemanRadio) {
+        servicemanRadio.addEventListener('change', function() {
+            setTimeout(function() {
+                setupCustomSkillsInput();
+                updateSelectedSkills();
+            }, 200);
+        });
+    }
+});
+
+function setupCustomSkillsInput() {
+    const customSkillsInput = document.getElementById('custom_skills');
+    const addBtn = document.getElementById('addSkillsBtn');
+    
+    if (!customSkillsInput) return;
+    
+    // Enable/disable add button based on input
+    function toggleAddButton() {
+        if (addBtn) {
+            const hasValue = customSkillsInput.value.trim().length > 0;
+            if (hasValue) {
+                // Enable button
+                addBtn.disabled = false;
+                addBtn.classList.remove('opacity-30', 'cursor-not-allowed');
+                addBtn.classList.add('cursor-pointer', 'hover:bg-purple-50');
+                addBtn.style.pointerEvents = 'auto';
+                addBtn.style.cursor = 'pointer !important';
+                addBtn.style.setProperty('cursor', 'pointer', 'important');
+                addBtn.title = 'Add skills (or press Enter)';
+                // Make icon hoverable
+                const icon = addBtn.querySelector('i');
+                if (icon) {
+                    icon.classList.add('transition-colors');
+                }
+            } else {
+                // Disable button
+                addBtn.disabled = true;
+                addBtn.classList.add('opacity-30', 'cursor-not-allowed');
+                addBtn.classList.remove('cursor-pointer', 'hover:bg-purple-50');
+                addBtn.style.pointerEvents = 'none';
+                addBtn.style.setProperty('cursor', 'not-allowed', 'important');
+                addBtn.title = 'Type skills to enable';
+            }
+        }
+    }
+    
+    // Check button state on input
+    customSkillsInput.addEventListener('input', toggleAddButton);
+    
+    // Enter key handler - prevent form submission
+    customSkillsInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
             e.preventDefault();
-            addCustomSkills();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            if (this.value.trim()) {
+                addCustomSkills();
+            }
+            return false;
         }
     });
     
-    document.getElementById('custom_skills').addEventListener('blur', addCustomSkills);
-});
+    // Also prevent default on keypress
+    customSkillsInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return false;
+        }
+    });
+    
+    // Prevent form submission when Enter is pressed in skills input
+    const form = document.getElementById('registerForm');
+    if (form) {
+        form.addEventListener('keydown', function(e) {
+            const target = e.target;
+            if (target && target.id === 'custom_skills' && (e.key === 'Enter' || e.keyCode === 13)) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (target.value.trim()) {
+                    addCustomSkills();
+                }
+                return false;
+            }
+        }, true); // Use capture phase
+    }
+    
+    // Initial button state
+    toggleAddButton();
+}
 
 function toggleUserTypeFields() {
     const userType = document.querySelector('input[name="user_type"]:checked')?.value;
@@ -422,16 +566,80 @@ function toggleSkill(skill) {
 
 function addCustomSkills() {
     const customInput = document.getElementById('custom_skills');
-    const customSkills = customInput.value.split(',').map(s => s.trim()).filter(s => s);
+    const addBtn = document.getElementById('addSkillsBtn');
     
+    if (!customInput) return;
+    
+    const inputValue = customInput.value.trim();
+    if (!inputValue) {
+        // Disable button if empty
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.classList.add('opacity-30', 'cursor-not-allowed');
+            addBtn.classList.remove('text-purple-600', 'hover:text-purple-700', 'hover:bg-purple-50', 'cursor-pointer');
+            addBtn.style.pointerEvents = 'none';
+            addBtn.title = 'Type skills to enable';
+        }
+        return;
+    }
+    
+    // Split by comma and clean up
+    const customSkills = inputValue.split(',')
+        .map(s => s.trim())
+        .filter(s => s && s.length > 0);
+    
+    if (customSkills.length === 0) {
+        customInput.value = '';
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.classList.add('opacity-30', 'cursor-not-allowed');
+            addBtn.classList.remove('text-purple-600', 'hover:text-purple-700', 'hover:bg-purple-50', 'cursor-pointer');
+            addBtn.style.pointerEvents = 'none';
+            addBtn.title = 'Type skills to enable';
+        }
+        return;
+    }
+    
+    // Add each skill
+    let addedCount = 0;
     customSkills.forEach(skill => {
-        if (skill && skill.length > 0) {
+        if (skill && skill.length > 0 && !selectedSkillsSet.has(skill)) {
             selectedSkillsSet.add(skill);
+            addedCount++;
         }
     });
     
+    // Clear input after adding
     customInput.value = '';
+    
+    // Disable button after clearing
+    if (addBtn) {
+        addBtn.disabled = true;
+        addBtn.classList.add('opacity-30', 'cursor-not-allowed');
+        addBtn.classList.remove('text-purple-600', 'hover:text-purple-700', 'hover:bg-purple-50', 'cursor-pointer');
+        addBtn.style.pointerEvents = 'none';
+        addBtn.title = 'Type skills to enable';
+    }
+    
+    // Update display
     updateSelectedSkills();
+    
+    // Visual feedback
+    if (addedCount > 0) {
+        customInput.classList.add('ring-2', 'ring-green-400');
+        if (addBtn) {
+            addBtn.classList.add('text-green-600');
+        }
+        setTimeout(() => {
+            customInput.classList.remove('ring-2', 'ring-green-400');
+            if (addBtn) {
+                addBtn.classList.remove('text-green-600');
+            }
+        }, 600);
+    }
+    
+    // Focus back on input for next skill entry
+    customInput.focus();
 }
 
 function removeSkill(skill) {
@@ -444,18 +652,24 @@ function updateSelectedSkills() {
     const container = document.getElementById('selectedSkills');
     const hiddenInput = document.getElementById('skills');
     
+    if (!container) return;
+    
     container.innerHTML = '';
     
     if (selectedSkillsSet.size === 0) {
-        container.innerHTML = '<p class="text-sm text-gray-400 italic"><i class="fas fa-info-circle mr-1"></i>No skills selected yet - Add skills above</p>';
+        container.innerHTML = '<p class="text-sm text-gray-400 italic w-full"><i class="fas fa-info-circle mr-1"></i>No skills selected yet - Type skills above and press Enter</p>';
     } else {
         selectedSkillsSet.forEach(skill => {
             const badge = document.createElement('span');
-            badge.className = 'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 border border-purple-300';
+            badge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-purple-100 to-purple-50 text-purple-800 border-2 border-purple-300 hover:border-purple-400 transition-all animate-fade-in';
             badge.innerHTML = `
-                <i class="fas fa-check-circle mr-1 text-purple-600"></i>${skill}
-                <button type="button" onclick="removeSkill('${skill.replace(/'/g, "\\'")}' )" class="ml-2 text-purple-600 hover:text-purple-900 hover:scale-110 transition-transform">
-                    <i class="fas fa-times-circle"></i>
+                <i class="fas fa-tag mr-1.5 text-purple-600 text-xs"></i>
+                <span>${skill}</span>
+                <button type="button" 
+                        onclick="removeSkill('${skill.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" 
+                        class="ml-2 text-purple-600 hover:text-red-600 hover:scale-110 transition-transform focus:outline-none"
+                        title="Remove skill">
+                    <i class="fas fa-times text-xs"></i>
                 </button>
             `;
             container.appendChild(badge);
@@ -463,7 +677,9 @@ function updateSelectedSkills() {
     }
     
     // Update hidden input
-    hiddenInput.value = Array.from(selectedSkillsSet).join(', ');
+    if (hiddenInput) {
+        hiddenInput.value = Array.from(selectedSkillsSet).join(', ');
+    }
 }
 </script>
 @endsection

@@ -99,24 +99,70 @@
                             <div x-show="errors.email" class="mt-1 text-sm text-red-600" x-text="errors.email"></div>
                         </div>
 
+                        <!-- Client Specific Fields -->
+                        <template x-if="user?.user_type === 'CLIENT'">
+                            <div class="space-y-6 p-6 bg-gray-50 rounded-lg">
+                                <h3 class="text-lg font-semibold text-gray-900">Contact Information</h3>
+                                
+                                <div>
+                                    <label for="phone_number" class="block text-sm font-medium text-gray-700 mb-2">
+                                        <i class="fas fa-phone mr-1 text-gray-500"></i>
+                                        Phone Number
+                                    </label>
+                                    <input 
+                                        id="phone_number" 
+                                        name="phone_number" 
+                                        type="tel" 
+                                        x-model="form.phone_number"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        :class="{ 'border-red-500': errors.phone_number }"
+                                        placeholder="e.g., +234 801 234 5678"
+                                    >
+                                    <div x-show="errors.phone_number" class="mt-1 text-sm text-red-600" x-text="errors.phone_number"></div>
+                                </div>
+
+                                <div>
+                                    <label for="address" class="block text-sm font-medium text-gray-700 mb-2">
+                                        <i class="fas fa-map-marker-alt mr-1 text-gray-500"></i>
+                                        Address
+                                    </label>
+                                    <textarea 
+                                        id="address" 
+                                        name="address" 
+                                        x-model="form.address"
+                                        rows="3"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                        :class="{ 'border-red-500': errors.address }"
+                                        placeholder="Enter your address (e.g., 123 Main Street, City, State)"
+                                    ></textarea>
+                                    <div x-show="errors.address" class="mt-1 text-sm text-red-600" x-text="errors.address"></div>
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        This address will be used as the default service location when booking services.
+                                    </p>
+                                </div>
+                            </div>
+                        </template>
+
                         <!-- Serviceman Specific Fields -->
                         <template x-if="user?.user_type === 'SERVICEMAN'">
                             <div class="space-y-6 p-6 bg-gray-50 rounded-lg">
                                 <h3 class="text-lg font-semibold text-gray-900">Professional Information</h3>
                                 
                                 <div>
-                                    <label for="phone" class="block text-sm font-medium text-gray-700 mb-2">
+                                    <label for="phone_number" class="block text-sm font-medium text-gray-700 mb-2">
                                         Phone Number *
                                     </label>
                                     <input 
-                                        id="phone" 
-                                        name="phone" 
+                                        id="phone_number" 
+                                        name="phone_number" 
                                         type="tel" 
-                                        x-model="form.phone"
+                                        x-model="form.phone_number"
                                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        :class="{ 'border-red-500': errors.phone }"
+                                        :class="{ 'border-red-500': errors.phone_number }"
+                                        placeholder="e.g., +234 801 234 5678"
                                     >
-                                    <div x-show="errors.phone" class="mt-1 text-sm text-red-600" x-text="errors.phone"></div>
+                                    <div x-show="errors.phone_number" class="mt-1 text-sm text-red-600" x-text="errors.phone_number"></div>
                                 </div>
 
                                 <div>
@@ -301,14 +347,22 @@ function profilePage() {
         },
 
         populateForm() {
+            // Load client profile data if available (Laravel converts camelCase to snake_case in JSON)
+            const clientProfile = this.user?.client_profile || null;
+            // Load serviceman profile data if available
+            const servicemanProfile = this.user?.serviceman_profile || null;
+            
             this.form = {
                 first_name: this.user?.first_name || '',
                 last_name: this.user?.last_name || '',
                 username: this.user?.username || '',
                 email: this.user?.email || '',
-                phone: '',
-                experience_years: '',
-                skills: ''
+                // Client fields
+                phone_number: clientProfile?.phone_number || servicemanProfile?.phone_number || '',
+                address: clientProfile?.address || '',
+                // Serviceman fields
+                experience_years: servicemanProfile?.experience_years || '',
+                skills: servicemanProfile?.skills || ''
             };
         },
 
@@ -336,8 +390,13 @@ function profilePage() {
                 const data = await response.json();
 
                 if (response.ok) {
+                    const updatedUser = await response.json();
+                    // Update local user object with response data
+                    if (updatedUser.client_profile || updatedUser.serviceman_profile) {
+                        this.user = updatedUser;
+                    }
                     this.showNotification('Profile updated successfully!', 'success');
-                    // Reload user data
+                    // Reload user data to get latest from server
                     await this.loadUserData();
                     this.populateForm();
                 } else {

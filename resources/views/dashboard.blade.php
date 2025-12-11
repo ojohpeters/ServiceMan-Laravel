@@ -103,14 +103,14 @@
 
                     <template x-if="user?.user_type === 'SERVICEMAN'">
                         <div>
-                            <a href="#" @click="updateAvailability()" 
+                            <a href="{{ route('availability.index') }}" 
                                class="block p-4 sm:p-6 bg-white rounded-lg shadow hover:shadow-md transition-shadow">
                                 <div class="flex items-center">
                                     <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
                                         <i class="fas fa-calendar-check text-green-600 text-lg sm:text-xl"></i>
                                     </div>
                                     <div class="min-w-0 flex-1">
-                                        <h3 class="font-semibold text-gray-900 text-sm sm:text-base">Update Availability</h3>
+                                        <h3 class="font-semibold text-gray-900 text-sm sm:text-base">Availability Calendar</h3>
                                         <p class="text-xs sm:text-sm text-gray-600 truncate">Manage your schedule</p>
                                     </div>
                                 </div>

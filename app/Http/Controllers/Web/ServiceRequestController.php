@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\ServiceRequest;
 use App\Models\Category;
 use App\Models\User;
-use App\Models\AppNotification;
 use App\Models\PriceNegotiation;
 use App\Models\Rating;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -16,6 +16,12 @@ use Carbon\Carbon;
 
 class ServiceRequestController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -146,6 +152,28 @@ class ServiceRequestController extends Controller
         
         // Check if emergency based on booking date (within 2 days from today)
         $bookingDate = Carbon::parse($request->booking_date);
+        
+        // Check if serviceman is busy on the booking date
+        if ($serviceman->isBusyOnDate($bookingDate)) {
+            $dateFormatted = $bookingDate->format('l, F j, Y');
+            $errorMessage = "⚠️ WARNING: This serviceman is marked as BUSY/UNAVAILABLE on {$dateFormatted}. Please select a different date to proceed with booking.";
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $errorMessage,
+                    'busy_date' => $bookingDate->format('Y-m-d')
+                ], 400);
+            }
+            return back()->withErrors([
+                'booking_date' => $errorMessage
+            ])->withInput();
+        }
+        
+        // Also check if serviceman is available today (for current status)
+        if ($serviceman->isBusyOnDate(Carbon::today())) {
+            // Log warning but don't block booking for future dates
+            \Log::info("Serviceman {$serviceman->id} is busy today but booking is for future date {$bookingDate->format('Y-m-d')}");
+        }
         $today = Carbon::today();
         $daysUntilBooking = $today->diffInDays($bookingDate, false); // false = signed difference
         
@@ -239,6 +267,9 @@ class ServiceRequestController extends Controller
             abort(403, 'Access denied.');
         }
 
+        // Ensure all relationships are loaded fresh
+        $serviceRequest->load(['client', 'serviceman', 'backupServiceman', 'category', 'payments', 'rating']);
+        
         // Get status message for UI
         $statusMessage = $this->getStatusMessage($serviceRequest->status);
         $nextSteps = $this->getNextSteps($serviceRequest, $user);
@@ -322,6 +353,192 @@ class ServiceRequestController extends Controller
             ->with('success', 'Service request updated successfully!');
     }
 
+    public function acceptAssignment(ServiceRequest $serviceRequest)
+    {
+        $user = Auth::user();
+        
+        // Only assigned serviceman (primary or backup who is now primary) can accept
+        $isPrimaryServiceman = $serviceRequest->serviceman_id === $user->id;
+        $isBackupServiceman = $serviceRequest->backup_serviceman_id === $user->id;
+        
+        if (!$isPrimaryServiceman && !$isBackupServiceman) {
+            abort(403, 'You are not assigned to this service request.');
+        }
+
+        if ($serviceRequest->status !== 'ASSIGNED_TO_SERVICEMAN') {
+            return back()->with('error', 'Invalid action for current status.');
+        }
+
+        // If backup serviceman is accepting and no primary exists, promote them to primary
+        if ($isBackupServiceman && !$serviceRequest->serviceman_id) {
+            $serviceRequest->update([
+                'serviceman_id' => $user->id,
+                'backup_serviceman_id' => null,
+                'accepted_at' => now(),
+            ]);
+        } else {
+            // Mark as accepted
+            $serviceRequest->update([
+                'accepted_at' => now(),
+            ]);
+        }
+
+        // Refresh to get updated relationships
+        $serviceRequest->refresh();
+
+        // Notify admin (sends email + creates notification)
+        $this->notificationService->notifyAdmins(
+            'ASSIGNMENT_ACCEPTED',
+            'Assignment Accepted',
+            "Serviceman {$user->full_name} has accepted service request #{$serviceRequest->id}.",
+            $serviceRequest,
+            ['serviceman_name' => $user->full_name]
+        );
+
+        return back()->with('success', 'Assignment accepted successfully!');
+    }
+
+    public function declineAssignment(Request $request, ServiceRequest $serviceRequest)
+    {
+        // Only assigned serviceman can decline
+        if ($serviceRequest->serviceman_id !== Auth::id()) {
+            abort(403);
+        }
+
+        if ($serviceRequest->status !== 'ASSIGNED_TO_SERVICEMAN') {
+            return back()->with('error', 'Invalid action for current status.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'decline_reason' => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $wasAccepted = $serviceRequest->accepted_at !== null;
+        $oldServicemanName = $serviceRequest->serviceman->full_name;
+        $servicemanProfile = $serviceRequest->serviceman->servicemanProfile;
+        $oldServicemanId = $serviceRequest->serviceman_id;
+        $backupServiceman = $serviceRequest->backupServiceman;
+
+        // If serviceman had accepted before, apply rating penalty
+        if ($wasAccepted && $servicemanProfile) {
+            // Apply 0.2 rating penalty before removing serviceman
+            $servicemanProfile->applyRatingPenalty(0.2);
+            
+            $serviceRequest->update([
+                'was_declined_after_acceptance' => true,
+            ]);
+        }
+
+        // Check if backup serviceman exists and is available - auto-assign them
+        if ($backupServiceman && $backupServiceman->servicemanProfile && $backupServiceman->servicemanProfile->is_available) {
+            // Auto-assign backup serviceman as primary
+            $serviceRequest->update([
+                'serviceman_id' => $backupServiceman->id,
+                'backup_serviceman_id' => null, // Remove backup assignment
+                'status' => 'ASSIGNED_TO_SERVICEMAN',
+                'accepted_at' => null, // Reset acceptance since it's a new assignment
+            ]);
+            
+            // Refresh to ensure relationships are updated
+            $serviceRequest->refresh();
+
+            // Notify admin (sends email + creates notification)
+            $message = $wasAccepted 
+                ? "Serviceman {$oldServicemanName} declined service request #{$serviceRequest->id} AFTER accepting it. A rating penalty has been applied. Backup serviceman {$backupServiceman->full_name} has been automatically assigned. Reason: " . ($request->decline_reason ?? 'No reason provided')
+                : "Serviceman {$oldServicemanName} declined service request #{$serviceRequest->id}. Backup serviceman {$backupServiceman->full_name} has been automatically assigned. Reason: " . ($request->decline_reason ?? 'No reason provided');
+
+            $this->notificationService->notifyAdmins(
+                'ASSIGNMENT_DECLINED_WITH_AUTO_ASSIGN',
+                $wasAccepted ? 'Assignment Declined - Backup Auto-Assigned' : 'Assignment Declined - Backup Auto-Assigned',
+                $message,
+                $serviceRequest,
+                ['old_serviceman_name' => $oldServicemanName, 'new_serviceman_name' => $backupServiceman->full_name, 'was_accepted' => $wasAccepted, 'decline_reason' => $request->decline_reason ?? 'No reason provided']
+            );
+
+            // Notify original serviceman about decline and penalty (sends email + creates notification)
+            $this->notificationService->notifyServiceman(
+                Auth::user(),
+                'ASSIGNMENT_DECLINED',
+                '❌ Assignment Declined & Reassigned',
+                "You have declined service request #{$serviceRequest->id}. It has been reassigned to {$backupServiceman->full_name}. " . ($wasAccepted ? 'A rating penalty of 0.2 has been applied to your profile.' : ''),
+                $serviceRequest,
+                ['decline_reason' => $request->decline_reason ?? 'No reason provided']
+            );
+
+            // Notify new serviceman (backup now primary) (sends email + creates notification)
+            $clientName = $serviceRequest->client->full_name ?? 'Client';
+            $clientPhone = $serviceRequest->client->phone_number ?? 'N/A';
+            $clientAddress = $serviceRequest->client_address ?? $serviceRequest->location ?? 'N/A';
+            
+            $this->notificationService->notifyServiceman(
+                $backupServiceman,
+                'SERVICE_ASSIGNED_FROM_BACKUP',
+                '🎉 New Service Request Assigned (from Backup)',
+                "You have been assigned service request #{$serviceRequest->id} as the primary serviceman, replacing {$oldServicemanName}. Please review the request and proceed with inspection. Service: {$serviceRequest->category->name}. Contact client: {$clientName} at {$clientPhone}. Location: {$clientAddress}",
+                $serviceRequest,
+                ['client_name' => $clientName, 'client_phone' => $clientPhone, 'client_address' => $clientAddress, 'auto_assigned' => true, 'old_serviceman_name' => $oldServicemanName]
+            );
+
+            // Notify client about serviceman change (sends email + creates notification)
+            $this->notificationService->notifyClient(
+                $serviceRequest->client,
+                'SERVICEMAN_CHANGED',
+                '🔄 Serviceman Changed - Please Check Dashboard',
+                "Due to some reasons, the serviceman assigned to your service request #{$serviceRequest->id} has been changed. Your new serviceman is {$backupServiceman->full_name}. Please check your dashboard for updated details. The new serviceman will contact you shortly.",
+                $serviceRequest,
+                ['old_serviceman_name' => $oldServicemanName, 'new_serviceman_name' => $backupServiceman->full_name]
+            );
+
+            return redirect()->route('dashboard')->with('success', 'Assignment declined. Backup serviceman ' . $backupServiceman->full_name . ' has been automatically assigned. ' . ($wasAccepted ? 'A rating penalty has been applied to the previous serviceman.' : ''));
+        } else {
+            // No backup serviceman available - reset to pending admin assignment
+            $serviceRequest->update([
+                'serviceman_id' => null,
+                'backup_serviceman_id' => null,
+                'status' => 'PENDING_ADMIN_ASSIGNMENT',
+            ]);
+
+            // Notify original serviceman about decline and penalty (sends email + creates notification)
+            $this->notificationService->notifyServiceman(
+                Auth::user(),
+                'ASSIGNMENT_DECLINED',
+                '❌ Assignment Declined',
+                "You have declined service request #{$serviceRequest->id}. It has been reverted to pending admin assignment. " . ($wasAccepted ? 'A rating penalty of 0.2 has been applied to your profile.' : ''),
+                $serviceRequest,
+                ['decline_reason' => $request->decline_reason ?? 'No reason provided']
+            );
+
+            // Notify admin (sends email + creates notification)
+            $message = $wasAccepted 
+                ? "Serviceman {$oldServicemanName} has declined service request #{$serviceRequest->id} AFTER accepting it. A rating penalty has been applied. No backup serviceman available. Manual assignment required. Reason: " . ($request->decline_reason ?? 'No reason provided')
+                : "Serviceman {$oldServicemanName} has declined service request #{$serviceRequest->id}. No backup serviceman available. Manual assignment required. Reason: " . ($request->decline_reason ?? 'No reason provided');
+
+            $this->notificationService->notifyAdmins(
+                'ASSIGNMENT_DECLINED_NO_BACKUP',
+                $wasAccepted ? 'Assignment Declined After Acceptance' : 'Assignment Declined',
+                $message,
+                $serviceRequest,
+                ['serviceman_name' => $oldServicemanName, 'was_accepted' => $wasAccepted, 'decline_reason' => $request->decline_reason ?? 'No reason provided']
+            );
+
+            // Notify client that serviceman declined and admin will reassign
+            $this->notificationService->notifyClient(
+                $serviceRequest->client,
+                'SERVICEMAN_DECLINED',
+                '⚠️ Serviceman Declined Your Request',
+                "Unfortunately, {$oldServicemanName} has declined your service request #{$serviceRequest->id}. Our admin team is working to assign a new professional and will notify you shortly.",
+                $serviceRequest,
+                ['serviceman_name' => $oldServicemanName]
+            );
+
+            return redirect()->route('dashboard')->with('success', 'Assignment declined. ' . ($wasAccepted ? 'A rating penalty has been applied. ' : '') . 'Admin will assign a new serviceman.');
+        }
+    }
+
     public function submitEstimate(Request $request, ServiceRequest $serviceRequest)
     {
         // Only assigned serviceman (primary or backup) can submit estimate
@@ -346,21 +563,43 @@ class ServiceRequestController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
-        $serviceRequest->update([
+        // If backup serviceman is submitting and there's no primary, promote backup to primary
+        if ($isBackup && !$serviceRequest->serviceman_id) {
+            $serviceRequest->update([
+                'serviceman_id' => $user->id,
+                'backup_serviceman_id' => null,
+            ]);
+        }
+
+        // Mark as accepted if not already accepted (first interaction)
+        $updates = [
             'serviceman_estimated_cost' => $request->serviceman_estimated_cost,
             'status' => 'SERVICEMAN_INSPECTED',
             'inspection_completed_at' => now(),
-        ]);
+        ];
 
-        // Notify ADMIN for review (not the client yet - admin adds markup first)
-        AppNotification::create([
-            'user_id' => null, // Admin notification
-            'service_request_id' => $serviceRequest->id,
-            'type' => 'COST_ESTIMATE_SUBMITTED',
-            'title' => '💰 Cost Estimate Submitted - Review Required',
-            'message' => "Serviceman {$serviceRequest->serviceman->full_name} has submitted a cost estimate of ₦" . number_format($request->serviceman_estimated_cost) . " for service request #{$serviceRequest->id}. Please review and add your markup before notifying the client.",
-            'is_read' => false,
-        ]);
+        if (!$serviceRequest->accepted_at) {
+            $updates['accepted_at'] = now();
+        }
+
+        $serviceRequest->update($updates);
+
+        // Refresh to get updated relationships
+        $serviceRequest->refresh();
+        $serviceRequest->load(['serviceman', 'backupServiceman']);
+
+        // Get serviceman name - use the user submitting (could be primary or backup)
+        $servicemanName = $user->full_name;
+        $servicemanType = $isBackup ? 'Backup serviceman' : 'Serviceman';
+
+        // Notify ADMIN for review (sends email + creates notification)
+        $this->notificationService->notifyAdmins(
+            'COST_ESTIMATE_SUBMITTED',
+            '💰 Cost Estimate Submitted - Review Required',
+            "{$servicemanType} {$servicemanName} has submitted a cost estimate of ₦" . number_format($request->serviceman_estimated_cost) . " for service request #{$serviceRequest->id}. Please review and add your markup before notifying the client.",
+            $serviceRequest,
+            ['serviceman_name' => $servicemanName, 'estimated_cost' => $request->serviceman_estimated_cost, 'is_backup' => $isBackup]
+        );
 
         return back()->with('success', 'Cost estimate submitted successfully! Admin will review and notify the client.');
     }
@@ -386,15 +625,14 @@ class ServiceRequestController extends Controller
             'work_completed_at' => now(),
         ]);
 
-        // Notify ADMIN ONLY - admin will then notify client professionally
-        AppNotification::create([
-            'user_id' => null, // Admin notification
-            'service_request_id' => $serviceRequest->id,
-            'type' => 'WORK_COMPLETED',
-            'title' => '✅ Work Completed - Action Required',
-            'message' => "Serviceman {$serviceRequest->serviceman->full_name} has marked service request #{$serviceRequest->id} as completed. Notes: \"{$request->completion_notes}\". Please verify and notify client {$serviceRequest->client->full_name}.",
-            'is_read' => false,
-        ]);
+        // Notify ADMIN (sends email + creates notification)
+        $this->notificationService->notifyAdmins(
+            'WORK_COMPLETED',
+            '✅ Work Completed - Action Required',
+            "Serviceman {$serviceRequest->serviceman->full_name} has marked service request #{$serviceRequest->id} as completed. Notes: \"{$request->completion_notes}\". Please verify and notify client {$serviceRequest->client->full_name}.",
+            $serviceRequest,
+            ['serviceman_name' => $serviceRequest->serviceman->full_name, 'client_name' => $serviceRequest->client->full_name, 'completion_notes' => $request->completion_notes]
+        );
 
         return back()->with('success', 'Work marked as completed! Admin will verify and notify the client.');
     }
@@ -414,25 +652,24 @@ class ServiceRequestController extends Controller
             'status' => 'AWAITING_PAYMENT',
         ]);
 
-        // Notify serviceman that client accepted the cost
-        AppNotification::create([
-            'user_id' => $serviceRequest->serviceman_id,
-            'service_request_id' => $serviceRequest->id,
-            'type' => 'COST_APPROVED',
-            'title' => '✅ Client Approved Cost Estimate',
-            'message' => "Client {$serviceRequest->client->full_name} has approved the cost estimate of ₦" . number_format($serviceRequest->final_cost) . " for service request #{$serviceRequest->id}. Waiting for client payment to begin work.",
-            'is_read' => false,
-        ]);
+        // Notify serviceman (sends email + creates notification)
+        $this->notificationService->notifyServiceman(
+            $serviceRequest->serviceman,
+            'COST_APPROVED',
+            '✅ Client Approved Cost Estimate',
+            "Client {$serviceRequest->client->full_name} has approved the cost estimate of ₦" . number_format($serviceRequest->final_cost) . " for service request #{$serviceRequest->id}. Waiting for client payment to begin work.",
+            $serviceRequest,
+            ['client_name' => $serviceRequest->client->full_name, 'final_cost' => $serviceRequest->final_cost]
+        );
 
-        // Notify admin
-        AppNotification::create([
-            'user_id' => null, // Admin notification
-            'service_request_id' => $serviceRequest->id,
-            'type' => 'COST_APPROVED',
-            'title' => '💵 Cost Approved - Awaiting Payment',
-            'message' => "Client {$serviceRequest->client->full_name} has approved the final cost of ₦" . number_format($serviceRequest->final_cost) . " for service request #{$serviceRequest->id}. Now awaiting payment.",
-            'is_read' => false,
-        ]);
+        // Notify admin (sends email + creates notification)
+        $this->notificationService->notifyAdmins(
+            'COST_APPROVED',
+            '💵 Cost Approved - Awaiting Payment',
+            "Client {$serviceRequest->client->full_name} has approved the final cost of ₦" . number_format($serviceRequest->final_cost) . " for service request #{$serviceRequest->id}. Now awaiting payment.",
+            $serviceRequest,
+            ['client_name' => $serviceRequest->client->full_name, 'final_cost' => $serviceRequest->final_cost]
+        );
 
         return back()->with('success', 'Cost accepted! Please proceed with final payment.');
     }
@@ -470,42 +707,43 @@ class ServiceRequestController extends Controller
             'review' => $request->review,
         ]);
 
-        // Update serviceman's profile
+        // Update serviceman's profile - use updateRating to handle penalties
         $serviceman = $serviceRequest->serviceman;
+        $averageRating = null;
         if ($serviceman && $serviceman->servicemanProfile) {
             $profile = $serviceman->servicemanProfile;
-            $totalRatings = $serviceman->ratingsReceived()->count();
-            $averageRating = $serviceman->ratingsReceived()->avg('rating');
-            
-            $profile->update([
-                'total_jobs_completed' => $totalRatings,
-                'rating' => round($averageRating, 1),
-            ]);
+            // Use updateRating method which handles penalty deduction
+            $profile->updateRating($request->rating);
+            // Refresh to get updated rating
+            $profile->refresh();
+            $averageRating = $profile->rating ?? 0;
         }
 
         // Generate star display for notifications
         $stars = str_repeat('⭐', $request->rating) . str_repeat('☆', 5 - $request->rating);
         $reviewText = $request->review ? " Review: \"{$request->review}\"" : "";
+        
+        // Format average rating for display (handle negative ratings)
+        $averageRatingDisplay = $averageRating !== null ? number_format($averageRating, 1) : '0.0';
 
-        // Notify serviceman about the rating
-        AppNotification::create([
-            'user_id' => $serviceRequest->serviceman_id,
-            'service_request_id' => $serviceRequest->id,
-            'type' => 'RATING_RECEIVED',
-            'title' => '⭐ New Rating Received',
-            'message' => "Client {$serviceRequest->client->full_name} rated your work on service request #{$serviceRequest->id}: {$stars} ({$request->rating}/5).{$reviewText} Your new average rating is {$averageRating}/5.0.",
-            'is_read' => false,
-        ]);
+        // Notify serviceman (sends email + creates notification)
+        $this->notificationService->notifyServiceman(
+            $serviceRequest->serviceman,
+            'RATING_RECEIVED',
+            '⭐ New Rating Received',
+            "Client {$serviceRequest->client->full_name} rated your work on service request #{$serviceRequest->id}: {$stars} ({$request->rating}/5).{$reviewText} Your new average rating is {$averageRatingDisplay}/5.0.",
+            $serviceRequest,
+            ['client_name' => $serviceRequest->client->full_name, 'rating' => $request->rating, 'review' => $request->review, 'average_rating' => $averageRatingDisplay]
+        );
 
-        // Notify admin about the rating
-        AppNotification::create([
-            'user_id' => null, // Admin notification
-            'service_request_id' => $serviceRequest->id,
-            'type' => 'RATING_SUBMITTED',
-            'title' => '⭐ Rating Submitted - Service Request #' . $serviceRequest->id,
-            'message' => "Client {$serviceRequest->client->full_name} rated serviceman {$serviceRequest->serviceman->full_name}: {$stars} ({$request->rating}/5) for service request #{$serviceRequest->id}.{$reviewText}",
-            'is_read' => false,
-        ]);
+        // Notify admin (sends email + creates notification)
+        $this->notificationService->notifyAdmins(
+            'RATING_SUBMITTED',
+            '⭐ Rating Submitted - Service Request #' . $serviceRequest->id,
+            "Client {$serviceRequest->client->full_name} rated serviceman {$serviceRequest->serviceman->full_name}: {$stars} ({$request->rating}/5) for service request #{$serviceRequest->id}.{$reviewText}",
+            $serviceRequest,
+            ['client_name' => $serviceRequest->client->full_name, 'serviceman_name' => $serviceRequest->serviceman->full_name, 'rating' => $request->rating, 'review' => $request->review]
+        );
 
         return back()->with('success', 'Thank you for your rating! The serviceman has been notified.');
     }
@@ -631,39 +869,36 @@ class ServiceRequestController extends Controller
         $difference = $currentCost - $proposedCost;
         $percentageReduction = round(($difference / $currentCost) * 100, 1);
 
-        // Create notification for admin - PRIORITY
-        \Log::info('Creating admin notification...');
-        $adminNotification = AppNotification::create([
-            'user_id' => null, // Admin notification
-            'service_request_id' => $serviceRequest->id,
-            'type' => 'PRICE_NEGOTIATION_REQUESTED',
-            'title' => '💬 Price Negotiation Request - Action Required',
-            'message' => "Client {$serviceRequest->client->full_name} wants to negotiate service request #{$serviceRequest->id}. Current: ₦" . number_format($currentCost) . " → Proposed: ₦" . number_format($proposedCost) . " ({$percentageReduction}% reduction). Reason: \"{$request->negotiation_reason}\". Please review and respond.",
-            'is_read' => false,
-        ]);
-        \Log::info('Admin notification created: ID = ' . $adminNotification->id);
+        // Notify admin (sends email + creates notification)
+        $this->notificationService->notifyAdmins(
+            'PRICE_NEGOTIATION_REQUESTED',
+            '💬 Price Negotiation Request - Action Required',
+            "Client {$serviceRequest->client->full_name} wants to negotiate service request #{$serviceRequest->id}. Current: ₦" . number_format($currentCost) . " → Proposed: ₦" . number_format($proposedCost) . " ({$percentageReduction}% reduction). Reason: \"{$request->negotiation_reason}\". Please review and respond.",
+            $serviceRequest,
+            ['client_name' => $serviceRequest->client->full_name, 'current_cost' => $currentCost, 'proposed_cost' => $proposedCost, 'percentage_reduction' => $percentageReduction, 'reason' => $request->negotiation_reason]
+        );
 
-        // Notify serviceman about negotiation
+        // Notify serviceman about negotiation (sends email + creates notification)
         if ($serviceRequest->serviceman_id) {
-            AppNotification::create([
-                'user_id' => $serviceRequest->serviceman_id,
-                'service_request_id' => $serviceRequest->id,
-                'type' => 'NEGOTIATION_STARTED',
-                'title' => '💬 Client Requested Price Negotiation',
-                'message' => "Client {$serviceRequest->client->full_name} is negotiating the price for service request #{$serviceRequest->id}. Proposed: ₦" . number_format($proposedCost) . " (down from ₦" . number_format($currentCost) . "). Admin will review and respond.",
-                'is_read' => false,
-            ]);
+            $this->notificationService->notifyServiceman(
+                $serviceRequest->serviceman,
+                'NEGOTIATION_STARTED',
+                '💬 Client Requested Price Negotiation',
+                "Client {$serviceRequest->client->full_name} is negotiating the price for service request #{$serviceRequest->id}. Proposed: ₦" . number_format($proposedCost) . " (down from ₦" . number_format($currentCost) . "). Admin will review and respond.",
+                $serviceRequest,
+                ['client_name' => $serviceRequest->client->full_name, 'current_cost' => $currentCost, 'proposed_cost' => $proposedCost]
+            );
         }
 
-        // Create notification for client - confirmation
-        AppNotification::create([
-            'user_id' => $serviceRequest->client_id,
-            'service_request_id' => $serviceRequest->id,
-            'type' => 'NEGOTIATION_SUBMITTED',
-            'title' => '✅ Negotiation Request Submitted',
-            'message' => "Your price negotiation request has been submitted successfully. Proposed amount: ₦" . number_format($request->proposed_amount) . " (current: ₦" . number_format($currentCost) . "). Our admin team will review and respond shortly.",
-            'is_read' => false,
-        ]);
+        // Notify client - confirmation (sends email + creates notification)
+        $this->notificationService->notifyClient(
+            $serviceRequest->client,
+            'NEGOTIATION_SUBMITTED',
+            '✅ Negotiation Request Submitted',
+            "Your price negotiation request has been submitted successfully. Proposed amount: ₦" . number_format($request->proposed_amount) . " (current: ₦" . number_format($currentCost) . "). Our admin team will review and respond shortly.",
+            $serviceRequest,
+            ['proposed_amount' => $request->proposed_amount, 'current_cost' => $currentCost]
+        );
 
         return redirect()->route('service-requests.show', $serviceRequest)
             ->with('success', 'Price negotiation request submitted successfully! Admin will review and respond shortly.');

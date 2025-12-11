@@ -177,22 +177,28 @@ class AuthController extends Controller
     public function forgotPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email'
+            'email' => 'required|email'
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
         }
 
+        // Security: Always show success message, don't reveal if email exists
+        // Only send email if user exists (silent check)
         $user = User::where('email', $request->email)->first();
-        $token = Str::random(64);
+        
+        if ($user) {
+            $token = Str::random(64);
+            // Store token in cache for 1 hour
+            cache()->put('password_reset_' . $user->id, $token, 3600);
+            $this->sendPasswordResetEmail($user, $token);
+        }
 
-        // Store token in cache for 1 hour
-        cache()->put('password_reset_' . $user->id, $token, 3600);
-
-        $this->sendPasswordResetEmail($user, $token);
-
-        return response()->json(['message' => 'Password reset email sent']);
+        // Always return the same success message for security
+        return response()->json([
+            'message' => 'If the email address exists in our system, a password reset link has been sent.'
+        ]);
     }
 
     public function resetPassword(Request $request)

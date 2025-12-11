@@ -2,16 +2,23 @@
 
 @section('content')
 <div class="container mx-auto px-4 py-8">
-    <div class="flex justify-between items-center mb-8">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
             <h1 class="text-3xl font-bold text-gray-900">Users Management</h1>
             <p class="text-gray-600 mt-2">Manage all users in the system</p>
         </div>
-        <button onclick="showModal('createAdminModal')" 
-                class="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors">
-            <i class="fas fa-user-shield mr-2"></i>
-            <span>Create Admin</span>
-        </button>
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ route('admin.servicemen') }}" 
+               class="inline-flex items-center px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg">
+                <i class="fas fa-filter mr-2"></i>
+                <span>Filter Servicemen</span>
+            </a>
+            <button onclick="showModal('createAdminModal')" 
+                    class="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors">
+                <i class="fas fa-user-shield mr-2"></i>
+                <span>Create Admin</span>
+            </button>
+        </div>
     </div>
 
     <!-- Users Table -->

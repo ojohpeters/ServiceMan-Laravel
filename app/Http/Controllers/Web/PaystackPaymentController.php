@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\ServiceRequest;
-use App\Models\AppNotification;
 use App\Services\PaystackService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -14,10 +14,12 @@ use Illuminate\Support\Facades\Validator;
 class PaystackPaymentController extends Controller
 {
     protected $paystackService;
+    protected $notificationService;
 
-    public function __construct(PaystackService $paystackService)
+    public function __construct(PaystackService $paystackService, NotificationService $notificationService)
     {
         $this->paystackService = $paystackService;
+        $this->notificationService = $notificationService;
     }
 
     public function index()
@@ -287,26 +289,25 @@ class PaystackPaymentController extends Controller
                 // Clear session data
                 session()->forget('pending_booking');
 
-                // Create notification for admin
+                // Notify admin (sends email + creates notification)
                 $client = \App\Models\User::find($pendingBooking['client_id']);
-                AppNotification::create([
-                    'user_id' => null,
-                    'service_request_id' => $serviceRequest->id,
-                    'type' => 'NEW_SERVICE_REQUEST',
-                    'title' => '🆕 New Service Request - Assignment Needed',
-                    'message' => "Client {$client->full_name} has created a PAID service request #{$serviceRequest->id} for {$pendingBooking['category_name']}. Booking fee: ₦" . number_format($pendingBooking['booking_fee']) . " already paid. Preferred serviceman: {$pendingBooking['serviceman_name']}. Please confirm assignment.",
-                    'is_read' => false,
-                ]);
+                $this->notificationService->notifyAdmins(
+                    'NEW_SERVICE_REQUEST',
+                    '🆕 New Service Request - Assignment Needed',
+                    "Client {$client->full_name} has created a PAID service request #{$serviceRequest->id} for {$pendingBooking['category_name']}. Booking fee: ₦" . number_format($pendingBooking['booking_fee']) . " already paid. Preferred serviceman: {$pendingBooking['serviceman_name']}. Please confirm assignment.",
+                    $serviceRequest,
+                    ['client_name' => $client->full_name, 'category_name' => $pendingBooking['category_name'], 'serviceman_name' => $pendingBooking['serviceman_name'], 'booking_fee' => $pendingBooking['booking_fee']]
+                );
 
-                // Notify client
-                AppNotification::create([
-                    'user_id' => $serviceRequest->client_id,
-                    'service_request_id' => $serviceRequest->id,
-                    'type' => 'BOOKING_CONFIRMED',
-                    'title' => '✅ Booking Confirmed & Paid',
-                    'message' => "Your service request #{$serviceRequest->id} has been created successfully and booking fee of ₦" . number_format($pendingBooking['booking_fee']) . " has been paid. Admin will assign {$pendingBooking['serviceman_name']} shortly.",
-                    'is_read' => false,
-                ]);
+                // Notify client (sends email + creates notification)
+                $this->notificationService->notifyClient(
+                    $client,
+                    'BOOKING_CONFIRMED',
+                    '✅ Booking Confirmed & Paid',
+                    "Your service request #{$serviceRequest->id} has been created successfully and booking fee of ₦" . number_format($pendingBooking['booking_fee']) . " has been paid. Admin will assign {$pendingBooking['serviceman_name']} shortly.",
+                    $serviceRequest,
+                    ['booking_fee' => $pendingBooking['booking_fee'], 'serviceman_name' => $pendingBooking['serviceman_name']]
+                );
 
                 return redirect()->route('service-requests.show', $serviceRequest)
                     ->with('success', 'Booking successful! Your service request has been created and payment confirmed.');
@@ -318,25 +319,22 @@ class PaystackPaymentController extends Controller
                     'status' => 'PENDING_ADMIN_ASSIGNMENT',
                 ]);
 
-                // Create notification for admin
-                AppNotification::create([
-                    'user_id' => null,
-                    'service_request_id' => $serviceRequest->id,
-                    'type' => 'BOOKING_FEE_PAID',
-                    'title' => '💰 Booking Fee Paid - Ready for Assignment',
-                    'message' => "Booking fee for service request #{$serviceRequest->id} has been paid. Please assign serviceman.",
-                    'is_read' => false,
-                ]);
+                // Notify admin (sends email + creates notification)
+                $this->notificationService->notifyAdmins(
+                    'BOOKING_FEE_PAID',
+                    '💰 Booking Fee Paid - Ready for Assignment',
+                    "Booking fee for service request #{$serviceRequest->id} has been paid. Please assign serviceman.",
+                    $serviceRequest
+                );
 
-                // Notify client
-                AppNotification::create([
-                    'user_id' => $serviceRequest->client_id,
-                    'service_request_id' => $serviceRequest->id,
-                    'type' => 'PAYMENT_CONFIRMED',
-                    'title' => '✅ Payment Confirmed',
-                    'message' => "Your booking fee has been received. We're processing your request.",
-                    'is_read' => false,
-                ]);
+                // Notify client (sends email + creates notification)
+                $this->notificationService->notifyClient(
+                    $serviceRequest->client,
+                    'PAYMENT_CONFIRMED',
+                    '✅ Payment Confirmed',
+                    "Your booking fee has been received. We're processing your request.",
+                    $serviceRequest
+                );
 
                 return redirect()->route('service-requests.show', $serviceRequest)
                     ->with('success', 'Booking fee paid successfully! Serviceman will be assigned shortly.');
@@ -355,25 +353,24 @@ class PaystackPaymentController extends Controller
                 'status' => 'PAYMENT_CONFIRMED',
             ]);
 
-            // Notify ADMIN ONLY - admin will then notify serviceman professionally
-            AppNotification::create([
-                'user_id' => null, // Admin notification
-                'service_request_id' => $serviceRequest->id,
-                'type' => 'FINAL_PAYMENT_RECEIVED',
-                'title' => '💰 Final Payment Received - Action Required',
-                'message' => "Final payment of ₦" . number_format($serviceRequest->final_cost) . " for service request #{$serviceRequest->id} has been received from {$serviceRequest->client->full_name}. Please contact and notify serviceman {$serviceRequest->serviceman->full_name} to begin work immediately.",
-                'is_read' => false,
-            ]);
+            // Notify ADMIN (sends email + creates notification)
+            $this->notificationService->notifyAdmins(
+                'FINAL_PAYMENT_RECEIVED',
+                '💰 Final Payment Received - Action Required',
+                "Final payment of ₦" . number_format($serviceRequest->final_cost) . " for service request #{$serviceRequest->id} has been received from {$serviceRequest->client->full_name}. Please contact and notify serviceman {$serviceRequest->serviceman->full_name} to begin work immediately.",
+                $serviceRequest,
+                ['client_name' => $serviceRequest->client->full_name, 'serviceman_name' => $serviceRequest->serviceman->full_name, 'final_cost' => $serviceRequest->final_cost]
+            );
 
-            // Notify client - payment confirmed, admin will coordinate next steps
-            AppNotification::create([
-                'user_id' => $serviceRequest->client_id,
-                'service_request_id' => $serviceRequest->id,
-                'type' => 'PAYMENT_CONFIRMED',
-                'title' => '✅ Payment Confirmed',
-                'message' => "Your final payment of ₦" . number_format($serviceRequest->final_cost) . " has been received successfully. Our admin team will coordinate with the serviceman to begin work shortly.",
-                'is_read' => false,
-            ]);
+            // Notify client (sends email + creates notification)
+            $this->notificationService->notifyClient(
+                $serviceRequest->client,
+                'PAYMENT_CONFIRMED',
+                '✅ Payment Confirmed',
+                "Your final payment of ₦" . number_format($serviceRequest->final_cost) . " has been received successfully. Our admin team will coordinate with the serviceman to begin work shortly.",
+                $serviceRequest,
+                ['final_cost' => $serviceRequest->final_cost]
+            );
 
             return redirect()->route('service-requests.show', $serviceRequest)
                 ->with('success', 'Final payment completed successfully! Our admin team will coordinate with the serviceman to begin work.');

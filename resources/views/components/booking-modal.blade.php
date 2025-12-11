@@ -18,7 +18,7 @@
         </div>
 
         <!-- Modal Body -->
-        <form id="bookingForm" method="POST" action="{{ route('service-requests.store') }}" class="p-4 sm:p-6 md:p-8 flex-1 overflow-y-auto">
+        <form id="bookingForm" method="POST" action="{{ route('service-requests.store') }}" class="p-4 sm:p-6 md:p-8 flex-1 overflow-y-auto" onsubmit="return validateModalBookingDate()">
             @csrf
             <input type="hidden" id="modalServicemanId" name="serviceman_id" value="">
             <input type="hidden" id="modalCategoryId" name="category_id" value="">
@@ -121,6 +121,18 @@
                            required
                            min="{{ date('Y-m-d', strtotime('+1 day')) }}"
                            class="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                    <!-- Availability warning for modal -->
+                    <div id="modalDateAvailabilityWarning" class="hidden mt-3 bg-red-50 border-l-4 border-red-500 rounded-r-lg p-3 sm:p-4">
+                        <div class="flex items-start">
+                            <i class="fas fa-exclamation-triangle text-red-600 text-lg sm:text-xl mr-3 mt-1"></i>
+                            <div>
+                                <h4 class="font-bold text-red-900 mb-1 text-sm sm:text-base">⚠️ Serviceman Unavailable</h4>
+                                <p class="text-xs sm:text-sm text-red-800" id="modalAvailabilityWarningMessage">
+                                    This serviceman is marked as busy on the selected date. Please choose a different date.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Emergency Checkbox -->
@@ -266,14 +278,33 @@ async function openBookingModal(servicemanData) {
     document.getElementById('modalServicemanRating').innerHTML = starsHtml;
     document.getElementById('modalServicemanStats').textContent = `${rating.toFixed(1)} • ${servicemanData.total_jobs || servicemanData.total_jobs_completed || 0} jobs`;
     
-    // Check availability status
-    const isAvailable = servicemanData.is_available !== false;
-    
-    // Update availability badge
-    const availabilityBadge = isAvailable
-        ? '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i>Available Now</span>'
-        : '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800"><i class="fas fa-clock mr-1"></i>Currently Busy</span>';
-    document.getElementById('modalAvailabilityStatus').innerHTML = availabilityBadge;
+    // Check availability status - check if busy today
+    fetch(`/api/servicemen/${servicemanData.id}/check-availability?date=${new Date().toISOString().split('T')[0]}`)
+        .then(response => response.json())
+        .then(todayData => {
+            const isAvailableToday = servicemanData.is_available !== false && !todayData.is_busy;
+            
+            // Update availability badge
+            const availabilityBadge = isAvailableToday
+                ? '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i>Available Now</span>'
+                : '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800"><i class="fas fa-clock mr-1"></i>Currently Busy</span>';
+            document.getElementById('modalAvailabilityStatus').innerHTML = availabilityBadge;
+            
+            // If booking date is already set, check it
+            const bookingDate = document.getElementById('modalBookingDate')?.value;
+            if (bookingDate) {
+                checkModalServicemanAvailability();
+            }
+        })
+        .catch(error => {
+            console.error('Error checking today availability:', error);
+            // Fallback to original check
+            const isAvailable = servicemanData.is_available !== false;
+            const availabilityBadge = isAvailable
+                ? '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i>Available Now</span>'
+                : '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800"><i class="fas fa-clock mr-1"></i>Currently Busy</span>';
+            document.getElementById('modalAvailabilityStatus').innerHTML = availabilityBadge;
+        });
     
     // Handle busy serviceman warning
     if (!isAvailable) {
@@ -366,6 +397,58 @@ function closeBookingModal() {
     document.getElementById('bookingForm').reset();
 }
 
+let isModalServicemanBusyOnSelectedDate = false;
+
+function checkModalServicemanAvailability() {
+    const servicemanId = document.getElementById('modalServicemanId')?.value;
+    const bookingDate = document.getElementById('modalBookingDate')?.value;
+    const warningDiv = document.getElementById('modalDateAvailabilityWarning');
+    const warningMessage = document.getElementById('modalAvailabilityWarningMessage');
+    const form = document.getElementById('bookingForm');
+    const submitButton = form?.querySelector('button[type="submit"]');
+    
+    if (!servicemanId || !bookingDate) {
+        if (warningDiv) warningDiv.classList.add('hidden');
+        isModalServicemanBusyOnSelectedDate = false;
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+        return;
+    }
+    
+    // Call API to check availability
+    fetch(`/api/servicemen/${servicemanId}/check-availability?date=${bookingDate}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.is_busy || !data.is_available) {
+                isModalServicemanBusyOnSelectedDate = true;
+                if (warningDiv) {
+                    warningDiv.classList.remove('hidden');
+                    if (warningMessage) {
+                        warningMessage.textContent = 
+                            `⚠️ WARNING: This serviceman is marked as BUSY/UNAVAILABLE on ${data.date_formatted}. Please select a different date.`;
+                    }
+                }
+                // Disable form submission
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+            } else {
+                isModalServicemanBusyOnSelectedDate = false;
+                if (warningDiv) warningDiv.classList.add('hidden');
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error checking availability:', error);
+        });
+}
+
 function updateBookingFee() {
     const bookingDate = document.getElementById('modalBookingDate').value;
     const isEmergency = document.getElementById('modalIsEmergency').checked;
@@ -420,7 +503,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const acceptBusyCheckbox = document.getElementById('acceptBusyServiceman');
     
     if (bookingDateField) {
-        bookingDateField.addEventListener('change', updateBookingFee);
+        bookingDateField.addEventListener('change', function() {
+            updateBookingFee();
+            checkModalServicemanAvailability();
+        });
     }
     
     if (emergencyCheckbox) {
@@ -459,4 +545,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+function validateModalBookingDate() {
+    if (isModalServicemanBusyOnSelectedDate) {
+        const bookingDate = document.getElementById('modalBookingDate')?.value;
+        if (bookingDate) {
+            const date = new Date(bookingDate);
+            const formattedDate = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            alert(`Cannot proceed: This serviceman is unavailable on ${formattedDate}. Please choose a different date.`);
+        }
+        return false;
+    }
+    return true;
+}
 </script>

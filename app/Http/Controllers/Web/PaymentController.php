@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\ServiceRequest;
-use App\Models\AppNotification;
 use App\Services\PaystackService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -15,10 +15,12 @@ use Illuminate\Support\Str;
 class PaymentController extends Controller
 {
     protected $paystackService;
+    protected $notificationService;
 
-    public function __construct(PaystackService $paystackService)
+    public function __construct(PaystackService $paystackService, NotificationService $notificationService)
     {
         $this->paystackService = $paystackService;
+        $this->notificationService = $notificationService;
     }
 
     public function index()
@@ -192,25 +194,23 @@ class PaymentController extends Controller
                 'status' => 'PENDING_ADMIN_ASSIGNMENT', // Admin still needs to assign
             ]);
 
-            // Create notification for admin - booking fee paid, ready for assignment
-            AppNotification::create([
-                'user_id' => null, // Admin notification
-                'service_request_id' => $serviceRequest->id,
-                'type' => 'BOOKING_FEE_PAID',
-                'title' => 'Booking Fee Paid - Ready for Assignment',
-                'message' => "Booking fee for service request #{$serviceRequest->id} has been paid. Please assign the serviceman and contact them.",
-                'is_read' => false,
-            ]);
+            // Notify admin (sends email + creates notification)
+            $this->notificationService->notifyAdmins(
+                'BOOKING_FEE_PAID',
+                '💰 Booking Fee Paid - Ready for Assignment',
+                "Booking fee for service request #{$serviceRequest->id} has been paid. Please assign the serviceman and contact them.",
+                $serviceRequest,
+                ['client_name' => $serviceRequest->client->full_name]
+            );
 
-            // Create notification for client - payment confirmed
-            AppNotification::create([
-                'user_id' => $serviceRequest->client_id,
-                'service_request_id' => $serviceRequest->id,
-                'type' => 'PAYMENT_CONFIRMED',
-                'title' => 'Payment Confirmed',
-                'message' => "Your booking fee has been received. We're now processing your request and will contact the serviceman shortly.",
-                'is_read' => false,
-            ]);
+            // Notify client (sends email + creates notification)
+            $this->notificationService->notifyClient(
+                $serviceRequest->client,
+                'PAYMENT_CONFIRMED',
+                '✅ Payment Confirmed',
+                "Your booking fee has been received. We're now processing your request and will contact the serviceman shortly.",
+                $serviceRequest
+            );
 
             if ($isJson) {
                 return response()->json([
@@ -228,37 +228,36 @@ class PaymentController extends Controller
                 'status' => 'IN_PROGRESS',
             ]);
 
-            // Create notification for admin
-            AppNotification::create([
-                'user_id' => null, // Admin notification
-                'service_request_id' => $serviceRequest->id,
-                'type' => 'FINAL_PAYMENT_RECEIVED',
-                'title' => 'Final Payment Received',
-                'message' => "Final payment of ₦{$serviceRequest->final_cost} for service request #{$serviceRequest->id} has been received. Please notify the serviceman to begin work.",
-                'is_read' => false,
-            ]);
+            // Notify admin (sends email + creates notification)
+            $this->notificationService->notifyAdmins(
+                'FINAL_PAYMENT_RECEIVED',
+                '💰 Final Payment Received - Action Required',
+                "Final payment of ₦" . number_format($serviceRequest->final_cost) . " for service request #{$serviceRequest->id} has been received from {$serviceRequest->client->full_name}. Please notify the serviceman to begin work.",
+                $serviceRequest,
+                ['client_name' => $serviceRequest->client->full_name, 'serviceman_name' => $serviceRequest->serviceman->full_name ?? 'N/A', 'final_cost' => $serviceRequest->final_cost]
+            );
 
-            // Create notification for serviceman
+            // Notify serviceman (sends email + creates notification)
             if ($serviceRequest->serviceman) {
-                AppNotification::create([
-                    'user_id' => $serviceRequest->serviceman_id,
-                    'service_request_id' => $serviceRequest->id,
-                    'type' => 'PAYMENT_RECEIVED',
-                    'title' => 'Final Payment Received - Begin Work',
-                    'message' => "Final payment for service request #{$serviceRequest->id} has been received. Please begin the work as soon as possible.",
-                    'is_read' => false,
-                ]);
+                $this->notificationService->notifyServiceman(
+                    $serviceRequest->serviceman,
+                    'PAYMENT_RECEIVED',
+                    '💰 Final Payment Received - Begin Work',
+                    "Final payment for service request #{$serviceRequest->id} has been received. Please begin the work as soon as possible.",
+                    $serviceRequest,
+                    ['client_name' => $serviceRequest->client->full_name, 'final_cost' => $serviceRequest->final_cost]
+                );
             }
 
-            // Create notification for client
-            AppNotification::create([
-                'user_id' => $serviceRequest->client_id,
-                'service_request_id' => $serviceRequest->id,
-                'type' => 'SERVICE_STARTED',
-                'title' => 'Service Started',
-                'message' => "Your final payment has been received. The serviceman will begin work on your request shortly.",
-                'is_read' => false,
-            ]);
+            // Notify client (sends email + creates notification)
+            $this->notificationService->notifyClient(
+                $serviceRequest->client,
+                'SERVICE_STARTED',
+                '✅ Service Started',
+                "Your final payment has been received. The serviceman will begin work on your request shortly.",
+                $serviceRequest,
+                ['final_cost' => $serviceRequest->final_cost]
+            );
 
             if ($isJson) {
                 return response()->json([

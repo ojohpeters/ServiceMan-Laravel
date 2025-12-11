@@ -135,6 +135,47 @@ class User extends Authenticatable
         return $this->hasMany(Rating::class, 'serviceman_id');
     }
 
+    public function availabilities()
+    {
+        return $this->hasMany(ServicemanAvailability::class, 'serviceman_id');
+    }
+
+    /**
+     * Check if serviceman is busy on a specific date
+     */
+    public function isBusyOnDate($date = null)
+    {
+        if (!$this->isServiceman()) {
+            return false;
+        }
+
+        $checkDate = $date ? \Carbon\Carbon::parse($date) : \Carbon\Carbon::today();
+        
+        // Check if there's a busy entry for this date
+        return \App\Models\ServicemanAvailability::where('serviceman_id', $this->id)
+            ->whereDate('date', $checkDate)
+            ->where('is_available', false)
+            ->exists();
+    }
+
+    /**
+     * Check if serviceman is available for booking (not busy today and profile is available)
+     */
+    public function isAvailableForBooking()
+    {
+        if (!$this->isServiceman()) {
+            return false;
+        }
+
+        $profile = $this->servicemanProfile;
+        if (!$profile || !$profile->is_available) {
+            return false;
+        }
+
+        // Check if today is a busy day
+        return !$this->isBusyOnDate(\Carbon\Carbon::today());
+    }
+
     public function negotiations()
     {
         return $this->hasMany(PriceNegotiation::class, 'proposed_by');

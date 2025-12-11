@@ -1,0 +1,72 @@
+===========================================
+CPANEL DEPLOYMENT - FIX INDEX-OF ERROR
+===========================================
+
+PROBLEM: Getting "index-of" page instead of your Laravel site.
+
+This happens because cPanel is serving files from the wrong directory.
+Laravel's public folder must be your document root.
+
+SOLUTION 1: Move files to correct structure (RECOMMENDED)
+
+1. Via cPanel File Manager or SSH, go to:
+   /home/sekionzy/serviceman.sekimbi.com/
+
+2. Current structure (WRONG):
+   serviceman.sekimbi.com/
+     ├── app/
+     ├── public/
+     ├── routes/
+     └── ... (all Laravel files)
+
+3. Extract your zip to a temp location, then organize:
+
+   OPTION A: If your subdomain root is already serviceman.sekimbi.com/
+   
+   Move all Laravel root files (app, bootstrap, config, etc.) to:
+   /home/sekionzy/serviceman.sekimbi.com/
+   
+   Then move contents of public/ folder to public_html/:
+   
+   mkdir -p /home/sekionzy/public_html
+   cp -r /home/sekionzy/serviceman.sekimbi.com/public/* /home/sekionzy/public_html/
+   
+   Update public/index.php to point to correct paths:
+   require __DIR__.'/../../serviceman.sekimbi.com/vendor/autoload.php';
+   $app = require_once __DIR__.'/../../serviceman.sekimbi.com/bootstrap/app.php';
+
+   OPTION B: Point subdomain document root to public folder (BETTER)
+   
+   In cPanel:
+   1. Go to "Subdomains"
+   2. Find "serviceman.sekimbi.com"
+   3. Click "Change"
+   4. Set Document Root to: serviceman.sekimbi.com/public
+   5. Save
+
+SOLUTION 2: Update public/index.php paths
+
+Edit /home/sekionzy/serviceman.sekimbi.com/public/index.php:
+
+Change these lines:
+require __DIR__.'/../vendor/autoload.php';
+$app = require_once __DIR__.'/../bootstrap/app.php';
+
+To (adjust path if needed):
+require __DIR__.'/../../serviceman.sekimbi.com/vendor/autoload.php';
+$app = require_once __DIR__.'/../../serviceman.sekimbi.com/bootstrap/app.php';
+
+SOLUTION 3: Use .htaccess to redirect (QUICK FIX)
+
+Create .htaccess in serviceman.sekimbi.com/ root:
+
+RewriteEngine On
+RewriteCond %{REQUEST_URI} !^/public/
+RewriteRule ^(.*)$ /public/$1 [L]
+
+Then access your site. It should work!
+
+VERIFY:
+After fixing, visit: http://serviceman.sekimbi.com
+You should see your Laravel app, not directory listing.
+

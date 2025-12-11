@@ -11,7 +11,10 @@ class HomeController extends Controller
 {
     public function index()
     {
-        $categories = Category::withCount('servicemen')->take(6)->get();
+        $categories = Category::where('is_active', true)
+            ->withCount('servicemen')
+            ->take(6)
+            ->get();
         
         // Get featured servicemen sorted by rating (highest to lowest)
         // Use servicemanProfile->rating which is the calculated average rating

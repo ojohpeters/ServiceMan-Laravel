@@ -14,8 +14,9 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
         
+        // Admins should be redirected to /admin/dashboard (the real admin dashboard)
         if ($user->isAdmin()) {
-            return $this->adminDashboard();
+            return redirect('/admin/dashboard');
         } elseif ($user->isClient()) {
             return $this->clientDashboard();
         } elseif ($user->isServiceman()) {
@@ -75,19 +76,25 @@ class DashboardController extends Controller
             'completedRequests' => $user->clientRequests()->where('status', 'COMPLETED')->count(),
         ];
 
-        // Calculate spending
-        $totalSpent = $user->clientRequests()
-            ->whereIn('status', ['COMPLETED'])
-            ->sum('final_cost');
+        // Calculate spending - Include both booking fees and final payments
+        $totalSpent = \App\Models\Payment::whereHas('serviceRequest', function($query) use ($user) {
+                $query->where('client_id', $user->id);
+            })
+            ->where('status', 'SUCCESSFUL')
+            ->whereIn('payment_type', ['INITIAL_BOOKING', 'FINAL_PAYMENT'])
+            ->sum('amount');
         
-        $thisMonthSpent = $user->clientRequests()
-            ->whereIn('status', ['COMPLETED'])
-            ->whereMonth('work_completed_at', now()->month)
-            ->whereYear('work_completed_at', now()->year)
-            ->sum('final_cost');
+        $thisMonthSpent = \App\Models\Payment::whereHas('serviceRequest', function($query) use ($user) {
+                $query->where('client_id', $user->id);
+            })
+            ->where('status', 'SUCCESSFUL')
+            ->whereIn('payment_type', ['INITIAL_BOOKING', 'FINAL_PAYMENT'])
+            ->whereMonth('paid_at', now()->month)
+            ->whereYear('paid_at', now()->year)
+            ->sum('amount');
 
-        $stats['totalSpent'] = $totalSpent;
-        $stats['thisMonthSpent'] = $thisMonthSpent;
+        $stats['totalSpent'] = $totalSpent ?? 0;
+        $stats['thisMonthSpent'] = $thisMonthSpent ?? 0;
 
         $recentRequests = $user->clientRequests()
             ->with(['serviceman', 'category'])
@@ -109,12 +116,21 @@ class DashboardController extends Controller
         $user = Auth::user();
         
         // Only count requests that are actually assigned to the serviceman (not pending admin assignment)
+        // Include both primary and backup assignments
         $assignedStatuses = ['ASSIGNED_TO_SERVICEMAN', 'SERVICEMAN_INSPECTED', 'AWAITING_CLIENT_APPROVAL', 'NEGOTIATING', 'AWAITING_PAYMENT', 'PAYMENT_CONFIRMED', 'IN_PROGRESS', 'WORK_COMPLETED', 'COMPLETED'];
         
+        // Count primary assignments
+        $primaryRequests = $user->servicemanRequests()->whereIn('status', $assignedStatuses);
+        // Count backup assignments that are assigned (not pending)
+        $backupRequests = \App\Models\ServiceRequest::where('backup_serviceman_id', $user->id)
+            ->whereIn('status', $assignedStatuses);
+        
         $stats = [
-            'totalRequests' => $user->servicemanRequests()->whereIn('status', $assignedStatuses)->count(),
-            'pendingRequests' => $user->servicemanRequests()->where('status', 'ASSIGNED_TO_SERVICEMAN')->count(),
-            'inProgressRequests' => $user->servicemanRequests()->where('status', 'IN_PROGRESS')->count(),
+            'totalRequests' => $primaryRequests->count() + $backupRequests->count(),
+            'pendingRequests' => $user->servicemanRequests()->where('status', 'ASSIGNED_TO_SERVICEMAN')->count() + 
+                                \App\Models\ServiceRequest::where('backup_serviceman_id', $user->id)->where('status', 'ASSIGNED_TO_SERVICEMAN')->count(),
+            'inProgressRequests' => $user->servicemanRequests()->where('status', 'IN_PROGRESS')->count() +
+                                   \App\Models\ServiceRequest::where('backup_serviceman_id', $user->id)->where('status', 'IN_PROGRESS')->count(),
             'completedRequests' => $user->servicemanRequests()->where('status', 'COMPLETED')->count(),
         ];
 
@@ -135,9 +151,18 @@ class DashboardController extends Controller
         $stats['totalJobsCompleted'] = $user->servicemanProfile->total_jobs_completed ?? 0;
 
         // Only show requests that have been assigned to this serviceman (exclude PENDING_ADMIN_ASSIGNMENT)
-        $recentRequests = $user->servicemanRequests()
-            ->whereIn('status', $assignedStatuses)
-            ->with(['client', 'category'])
+        // Include both primary and backup assignments
+        $recentRequests = \App\Models\ServiceRequest::where(function($query) use ($user, $assignedStatuses) {
+                $query->where(function($q) use ($user, $assignedStatuses) {
+                    $q->where('serviceman_id', $user->id)
+                      ->whereIn('status', $assignedStatuses);
+                })
+                ->orWhere(function($q) use ($user, $assignedStatuses) {
+                    $q->where('backup_serviceman_id', $user->id)
+                      ->whereIn('status', $assignedStatuses);
+                });
+            })
+            ->with(['client', 'category', 'serviceman', 'backupServiceman'])
             ->latest()
             ->take(5)
             ->get();

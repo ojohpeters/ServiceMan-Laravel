@@ -45,6 +45,8 @@ class ServiceRequest extends Model
         'service_description',
         'inspection_completed_at',
         'work_completed_at',
+        'accepted_at',
+        'was_declined_after_acceptance',
         'is_deleted'
     ];
 
@@ -58,6 +60,8 @@ class ServiceRequest extends Model
         'final_cost' => 'decimal:2',
         'inspection_completed_at' => 'datetime',
         'work_completed_at' => 'datetime',
+        'accepted_at' => 'datetime',
+        'was_declined_after_acceptance' => 'boolean',
         'is_deleted' => 'boolean'
     ];
 

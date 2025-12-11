@@ -56,7 +56,7 @@
                                         </div>
                                         <div>
                                             <h3 class="text-xl font-bold text-gray-900">{{ $serviceman->full_name }}</h3>
-                                            <p class="text-sm text-gray-600">@{{ $serviceman->username }}</p>
+                                            <p class="text-sm text-gray-600">{{ $serviceman->username ?? 'N/A' }}</p>
                                             <div class="flex items-center mt-1 space-x-3">
                                                 <span class="text-xs text-gray-500">
                                                     <i class="fas fa-envelope mr-1"></i>{{ $serviceman->email }}

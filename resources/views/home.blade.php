@@ -105,9 +105,33 @@
                 </div>
                 
                 <!-- Right Content - Service Cards -->
-                @if($categories->count() > 0)
                 <div class="grid grid-cols-2 gap-4">
-                    @foreach($categories->take(3) as $index => $category)
+                    @php
+                        // Map category names to FontAwesome icons
+                        $iconMap = [
+                            'Electrical' => 'bolt',
+                            'Plumbing' => 'wrench',
+                            'HVAC' => 'thermometer-half',
+                            'Carpentry' => 'hammer',
+                            'Painting' => 'paint-brush',
+                            'Cleaning' => 'broom',
+                            'Appliance Repair' => 'toolbox',
+                            'Gardening' => 'seedling',
+                        ];
+                        
+                        // Use categories if available, otherwise use fallback
+                        if ($categories->count() > 0) {
+                            $displayCategories = $categories->take(3);
+                        } else {
+                            $displayCategories = collect([
+                                (object)['name' => 'Electrical Services', 'description' => 'Professional electrical repairs and installations'],
+                                (object)['name' => 'Plumbing', 'description' => 'Expert plumbing solutions'],
+                                (object)['name' => 'HVAC', 'description' => 'Climate control experts'],
+                            ]);
+                        }
+                    @endphp
+                    
+                    @foreach($displayCategories as $index => $category)
                         @php
                             $isFirst = $index === 0;
                             $cardClasses = $isFirst ? 'col-span-2 lg:col-span-1' : '';
@@ -116,17 +140,21 @@
                             $titleClass = $isFirst ? 'text-lg' : 'text-base';
                             $textClass = $isFirst ? 'text-sm' : 'text-xs';
                             $alignClass = $isFirst ? 'text-center lg:text-left' : 'text-center';
+                            
+                            // Get icon from category name
+                            $categoryName = $category->name;
+                            $iconKey = explode(' ', $categoryName)[0]; // Get first word (e.g., "Electrical" from "Electrical Services")
+                            $icon = $iconMap[$iconKey] ?? 'tools';
                         @endphp
-                        <div class="bg-gray-900 bg-opacity-70 backdrop-blur-md rounded-xl p-6 border-2 border-yellow-400 border-opacity-50 {{ $cardClasses }} shadow-xl">
-                            <div class="{{ $iconSize }} bg-yellow-500 rounded-xl flex items-center justify-center mb-{{ $isFirst ? '4' : '3' }} mx-auto {{ $isFirst ? 'lg:mx-0' : '' }} shadow-md">
-                                <i class="fas fa-{{ $category->icon ?? 'tools' }} text-gray-900 {{ $iconClass }}"></i>
+                        <div class="bg-gray-900 bg-opacity-70 backdrop-blur-md rounded-xl p-6 border-2 border-yellow-400 border-opacity-50 {{ $cardClasses }} shadow-xl hover:border-yellow-400 hover:scale-105 transition-all">
+                            <div class="{{ $iconSize }} bg-yellow-500 rounded-xl flex items-center justify-center mb-{{ $isFirst ? '4' : '3' }} mx-auto {{ $isFirst ? 'lg:mx-0' : '' }} shadow-md transform hover:scale-110 transition-transform">
+                                <i class="fas fa-{{ $icon }} text-gray-900 {{ $iconClass }}"></i>
                             </div>
-                            <h3 class="{{ $titleClass }} font-bold mb-{{ $isFirst ? '2' : '1' }} {{ $alignClass }} text-white">{{ $category->name }}</h3>
-                            <p class="text-gray-200 {{ $textClass }} {{ $alignClass }} font-medium">{{ Str::limit($category->description ?? 'Professional service', 30) }}</p>
+                            <h3 class="{{ $titleClass }} font-bold mb-{{ $isFirst ? '2' : '1' }} {{ $alignClass }} text-white">{{ $categoryName }}</h3>
+                            <p class="text-gray-200 {{ $textClass }} {{ $alignClass }} font-medium">{{ Str::limit($category->description ?? 'Professional service', 40) }}</p>
                         </div>
                     @endforeach
                 </div>
-                @endif
             </div>
         </div>
         

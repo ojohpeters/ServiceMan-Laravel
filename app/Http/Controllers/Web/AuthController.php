@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\AppNotification;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -14,6 +15,13 @@ use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     public function showLogin()
     {
         return view('auth.login');
@@ -56,6 +64,10 @@ class AuthController extends Controller
         }
 
         // User is verified and (if serviceman) approved - go to dashboard
+        // Admins should go to /admin/dashboard instead of /dashboard
+        if ($user->isAdmin()) {
+            return redirect()->intended('/admin/dashboard');
+        }
         return redirect()->intended('/dashboard');
     }
 
@@ -109,29 +121,12 @@ class AuthController extends Controller
         // Create profile based on user type
         if ($request->user_type === 'CLIENT') {
             $user->clientProfile()->create([
+                'phone_number' => $request->phone_number ?? '',
                 'address' => $request->address ?? ''
             ]);
         } elseif ($request->user_type === 'SERVICEMAN') {
-            // If custom category provided, create a custom service request
-            if ($request->filled('custom_category') && !$request->filled('category_id')) {
-                \App\Models\CustomServiceRequest::create([
-                    'serviceman_id' => $user->id,
-                    'service_name' => $request->custom_category,
-                    'service_description' => $request->bio ?? 'Custom service category requested during registration',
-                    'why_needed' => 'Requested during registration',
-                    'status' => 'PENDING',
-                ]);
-                
-                // Notify admin
-                AppNotification::create([
-                    'user_id' => null,
-                    'service_request_id' => null,
-                    'type' => 'CUSTOM_SERVICE_REQUEST',
-                    'title' => '🆕 New Custom Service Request (Registration)',
-                    'message' => "New serviceman {$user->full_name} requested custom category '{$request->custom_category}' during registration. Please review and assign.",
-                    'is_read' => false,
-                ]);
-            }
+            // Custom category feature disabled - admin will assign category after review
+            // If serviceman doesn't select a category, admin will assign one during approval
             
             $user->servicemanProfile()->create([
                 'category_id' => $request->category_id,
@@ -156,15 +151,14 @@ class AuthController extends Controller
                 $message = 'Registration successful! Please verify your email. Your account is pending admin approval. Admin will review your profile and contact you for physical verification. You cannot login until approved.';
             }
             
-            // Notify admin about new serviceman registration
-            AppNotification::create([
-                'user_id' => null, // Admin notification
-                'service_request_id' => null,
-                'type' => 'NEW_SERVICEMAN_REGISTRATION',
-                'title' => '👨‍🔧 New Serviceman Registration',
-                'message' => "New serviceman {$user->full_name} ({$user->email}) has registered and needs approval. Please review their profile.",
-                'is_read' => false,
-            ]);
+            // Notify admin about new serviceman registration (sends email + creates notification)
+            $this->notificationService->notifyAdmins(
+                'NEW_SERVICEMAN_REGISTRATION',
+                '👨‍🔧 New Serviceman Registration',
+                "New serviceman {$user->full_name} ({$user->email}) has registered and needs approval. Please review their profile at: " . url("/admin/pending-servicemen"),
+                null, // No service request
+                ['serviceman_id' => $user->id, 'serviceman_name' => $user->full_name, 'serviceman_email' => $user->email]
+            );
         } else {
             $message = 'Registration successful! Please check your email to verify your account.';
         }
@@ -175,6 +169,10 @@ class AuthController extends Controller
             return redirect()->route('profile')->with('success', $message);
         }
 
+        // Admins should go to /admin/dashboard
+        if ($user->isAdmin()) {
+            return redirect('/admin/dashboard')->with('success', $message);
+        }
         return redirect('/dashboard')->with('success', $message);
     }
 
@@ -195,22 +193,26 @@ class AuthController extends Controller
     public function forgotPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email'
+            'email' => 'required|email'
         ]);
 
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
 
+        // Security: Always show success message, don't reveal if email exists
+        // Only send email if user exists (silent check)
         $user = User::where('email', $request->email)->first();
-        $token = Str::random(64);
+        
+        if ($user) {
+            $token = Str::random(64);
+            // Store token in cache for 1 hour
+            cache()->put('password_reset_' . $user->id, $token, 3600);
+            $this->sendPasswordResetEmail($user, $token);
+        }
 
-        // Store token in cache for 1 hour
-        cache()->put('password_reset_' . $user->id, $token, 3600);
-
-        $this->sendPasswordResetEmail($user, $token);
-
-        return back()->with('status', 'Password reset email sent!');
+        // Always return the same success message for security
+        return back()->with('status', 'If the email address exists in our system, a password reset link has been sent.');
     }
 
     public function showResetPassword($token)
@@ -247,9 +249,43 @@ class AuthController extends Controller
     {
         try {
             $resetUrl = url('/reset-password/' . $token . '?email=' . $user->email);
+            
+            // Validate email address
+            if (!filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+                \Log::error('Invalid email address for password reset', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                ]);
+                return;
+            }
+            
+            // Send email synchronously (not queued) for immediate delivery
             Mail::to($user->email)->send(new \App\Mail\ResetPasswordEmail($user, $resetUrl));
+            
+            \Log::info('Password reset email sent successfully', [
+                'to' => $user->email,
+                'user_id' => $user->id,
+                'driver' => config('mail.default'),
+                'host' => config('mail.mailers.smtp.host'),
+                'port' => config('mail.mailers.smtp.port'),
+            ]);
         } catch (\Exception $e) {
-            \Log::error('Failed to send password reset email: ' . $e->getMessage());
+            \Log::error('Failed to send password reset email', [
+                'to' => $user->email,
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'driver' => config('mail.default'),
+                'host' => config('mail.mailers.smtp.host'),
+                'port' => config('mail.mailers.smtp.port'),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            // Re-throw to see the error in development
+            if (config('app.debug')) {
+                throw $e;
+            }
         }
     }
 
@@ -262,6 +298,10 @@ class AuthController extends Controller
         }
 
         if ($user->is_email_verified) {
+            // Admins should go to /admin/dashboard
+            if ($user->isAdmin()) {
+                return redirect('/admin/dashboard')->with('info', 'Email already verified!');
+            }
             return redirect('/dashboard')->with('info', 'Email already verified!');
         }
 
@@ -271,6 +311,10 @@ class AuthController extends Controller
             'email_verification_token' => null
         ]);
 
+        // Admins should go to /admin/dashboard
+        if ($user->isAdmin()) {
+            return redirect('/admin/dashboard')->with('success', 'Email verified successfully! Welcome to ServiceMan!');
+        }
         return redirect('/dashboard')->with('success', 'Email verified successfully! Welcome to ServiceMan!');
     }
 
@@ -366,6 +410,10 @@ class AuthController extends Controller
                 return redirect()->route('profile')
                     ->with('info', 'This page is only for servicemen awaiting approval.');
             }
+            // Admins should go to /admin/dashboard
+            if ($user->isAdmin()) {
+                return redirect('/admin/dashboard');
+            }
             return redirect()->route('dashboard');
         }
 
@@ -375,6 +423,10 @@ class AuthController extends Controller
             if (!$user->is_email_verified) {
                 return redirect()->route('profile')
                     ->with('info', 'Your account is approved. Please verify your email to continue.');
+            }
+            // Admins should go to /admin/dashboard
+            if ($user->isAdmin()) {
+                return redirect('/admin/dashboard');
             }
             return redirect()->route('dashboard');
         }

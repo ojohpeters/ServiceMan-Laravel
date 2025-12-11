@@ -61,7 +61,7 @@
                 <p class="text-blue-100 text-sm mt-1">Fill in the information below to proceed</p>
             </div>
 
-            <form action="{{ route('service-requests.store') }}" method="POST" class="p-8">
+            <form action="{{ route('service-requests.store') }}" method="POST" class="p-8" id="bookingForm" onsubmit="return validateBookingDate()">
                 @csrf
 
                 @if($selectedServiceman)
@@ -140,6 +140,7 @@
                             </label>
                             <div id="servicemen-list" class="space-y-3">
                                 <!-- Servicemen will be loaded here via AJAX -->
+                                <p class="text-gray-500 text-center py-4 text-sm">Select a service category above to see available servicemen</p>
                             </div>
                             @error('serviceman_id')
                                 <p class="mt-1 text-sm text-red-600 flex items-center">
@@ -181,6 +182,18 @@
                                value="{{ old('booking_date') }}"
                                min="{{ date('Y-m-d', strtotime('+1 day')) }}"
                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        <!-- Availability warning -->
+                        <div id="dateAvailabilityWarning" class="hidden mt-3 bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+                            <div class="flex items-start">
+                                <i class="fas fa-exclamation-triangle text-red-600 text-xl mr-3 mt-1"></i>
+                                <div>
+                                    <h4 class="font-bold text-red-900 mb-1">⚠️ Serviceman Unavailable</h4>
+                                    <p class="text-sm text-red-800" id="availabilityWarningMessage">
+                                        This serviceman is marked as busy on the selected date. Please choose a different date.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                         @error('booking_date')
                             <p class="mt-1 text-sm text-red-600 flex items-center">
                                 <i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}
@@ -374,7 +387,7 @@ document.getElementById('category_id')?.addEventListener('change', function() {
     const servicemenList = document.getElementById('servicemen-list');
     
     servicemanSelection.classList.remove('hidden');
-    servicemenList.innerHTML = '<p class="text-gray-500 text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i>Loading servicemen...</p>';
+    servicemenList.innerHTML = '<div class="text-gray-500 text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i>Loading servicemen...</div>';
     
     // Fetch servicemen for this category
     fetch(`/api/categories/${categoryId}/servicemen`)
@@ -383,6 +396,12 @@ document.getElementById('category_id')?.addEventListener('change', function() {
             if (data.servicemen && data.servicemen.length > 0) {
                 let html = '';
                 data.servicemen.forEach(serviceman => {
+                    // Ensure all values are defined
+                    const fullName = serviceman.full_name || serviceman.username || 'Unknown Professional';
+                    const experienceYears = serviceman.experience_years || serviceman.years_of_experience || 0;
+                    const rating = serviceman.rating || 0;
+                    const totalJobs = serviceman.total_jobs_completed || serviceman.total_jobs || 0;
+                    
                     html += `
                         <div class="bg-white border-2 border-gray-200 hover:border-blue-500 rounded-xl p-4 cursor-pointer transition-all transform hover:scale-102" onclick="selectServiceman(${serviceman.id})">
                             <div class="flex items-center space-x-4">
@@ -390,11 +409,11 @@ document.getElementById('category_id')?.addEventListener('change', function() {
                                     <i class="fas fa-user text-white text-xl"></i>
                                 </div>
                                 <div class="flex-1">
-                                    <h5 class="font-bold text-gray-900">${serviceman.full_name}</h5>
-                                    <p class="text-sm text-gray-600">${serviceman.experience_years || 0} years experience</p>
+                                    <h5 class="font-bold text-gray-900">${fullName}</h5>
+                                    <p class="text-sm text-gray-600">${experienceYears} ${experienceYears === 1 ? 'year' : 'years'} experience</p>
                                     <div class="flex items-center mt-1">
-                                        <span class="text-xs text-yellow-600">★ ${serviceman.rating || 0}</span>
-                                        <span class="text-xs text-gray-500 ml-2">${serviceman.total_jobs_completed || 0} jobs</span>
+                                        <span class="text-xs text-yellow-600">★ ${rating.toFixed(1)}</span>
+                                        <span class="text-xs text-gray-500 ml-2">${totalJobs} ${totalJobs === 1 ? 'job' : 'jobs'}</span>
                                     </div>
                                 </div>
                                 <input type="radio" name="serviceman_id" value="${serviceman.id}" required class="h-5 w-5 text-blue-600">
@@ -415,6 +434,75 @@ document.getElementById('category_id')?.addEventListener('change', function() {
 
 function selectServiceman(servicemanId) {
     document.querySelector(`input[value="${servicemanId}"]`).checked = true;
+    // Check availability when serviceman is selected
+    if (document.getElementById('booking_date')?.value) {
+        checkServicemanAvailability();
+    }
+}
+
+let isServicemanBusyOnSelectedDate = false;
+
+function checkServicemanAvailability() {
+    const servicemanId = document.querySelector('input[name="serviceman_id"]:checked')?.value || 
+                        document.querySelector('input[name="serviceman_id"]')?.value;
+    const bookingDate = document.getElementById('booking_date')?.value;
+    const warningDiv = document.getElementById('dateAvailabilityWarning');
+    const warningMessage = document.getElementById('availabilityWarningMessage');
+    const submitButton = document.getElementById('bookingForm')?.querySelector('button[type="submit"]');
+    
+    if (!servicemanId || !bookingDate) {
+        if (warningDiv) warningDiv.classList.add('hidden');
+        isServicemanBusyOnSelectedDate = false;
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+        return;
+    }
+    
+    // Call API to check availability
+    fetch(`/api/servicemen/${servicemanId}/check-availability?date=${bookingDate}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.is_busy || !data.is_available) {
+                isServicemanBusyOnSelectedDate = true;
+                if (warningDiv) {
+                    warningDiv.classList.remove('hidden');
+                    if (warningMessage) {
+                        warningMessage.textContent = 
+                            `⚠️ WARNING: This serviceman is marked as BUSY/UNAVAILABLE on ${data.date_formatted}. Please select a different date.`;
+                    }
+                }
+                // Disable form submission
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+            } else {
+                isServicemanBusyOnSelectedDate = false;
+                if (warningDiv) warningDiv.classList.add('hidden');
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error checking availability:', error);
+        });
+}
+
+function validateBookingDate() {
+    if (isServicemanBusyOnSelectedDate) {
+        const bookingDate = document.getElementById('booking_date')?.value;
+        if (bookingDate) {
+            const date = new Date(bookingDate);
+            const formattedDate = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            alert(`Cannot proceed: This serviceman is unavailable on ${formattedDate}. Please choose a different date.`);
+        }
+        return false;
+    }
+    return true;
 }
 
 // Add event listeners
@@ -423,7 +511,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const emergencyCheckbox = document.getElementById('is_emergency');
     
     if (bookingDateField) {
-        bookingDateField.addEventListener('change', updateBookingFee);
+        bookingDateField.addEventListener('change', function() {
+            updateBookingFee();
+            checkServicemanAvailability();
+        });
     }
     
     if (emergencyCheckbox) {

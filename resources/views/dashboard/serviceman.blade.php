@@ -143,13 +143,46 @@
             <div class="p-6">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-medium text-gray-500 mb-1">Average Rating</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ number_format($stats['averageRating'], 1) }}/5.0</p>
-                        <div class="flex items-center mt-1">
-                            @for($i = 1; $i <= 5; $i++)
-                                <i class="fas fa-star text-xs {{ $i <= $stats['averageRating'] ? 'text-yellow-400' : 'text-gray-300' }}"></i>
-                            @endfor
-                        </div>
+                        <p class="text-sm font-medium text-gray-500 mb-1">Your Rating</p>
+                        @php
+                            $rating = $stats['averageRating'] ?? 0;
+                            $displayRating = max(0, min(5, $rating)); // Clamp between 0-5 for star display
+                            $fullStars = floor($displayRating);
+                            $hasHalfStar = ($displayRating - $fullStars) >= 0.5;
+                            $penaltyDebt = $rating < 0 ? abs($rating) : 0;
+                        @endphp
+                        <p class="text-2xl font-bold {{ $rating < 0 ? 'text-red-600' : 'text-gray-900' }}">
+                            @if($rating < 0)
+                                -{{ number_format($penaltyDebt, 1) }}
+                                <span class="text-sm font-normal text-red-500">(Rating Debt)</span>
+                            @else
+                                {{ number_format($rating, 1) }}/5.0
+                            @endif
+                        </p>
+                        @if($rating < 0)
+                            <div class="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <p class="text-xs text-red-800">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    <strong>Rating Penalty:</strong> You have a debt of {{ number_format($penaltyDebt, 2) }} stars. This will be deducted from your next client rating.
+                                </p>
+                            </div>
+                        @else
+                            <div class="flex items-center mt-1">
+                                @for($i = 1; $i <= 5; $i++)
+                                    @if($i <= $fullStars)
+                                        <i class="fas fa-star text-xs text-yellow-400"></i>
+                                    @elseif($i == $fullStars + 1 && $hasHalfStar)
+                                        <div class="relative inline-block" style="width: 12px; height: 12px;">
+                                            <i class="fas fa-star text-xs text-gray-300 absolute"></i>
+                                            <i class="fas fa-star text-xs text-yellow-400 absolute" style="clip-path: inset(0 {{ 100 - ($displayRating - $fullStars) * 100 }}% 0 0);"></i>
+                                        </div>
+                                    @else
+                                        <i class="fas fa-star text-xs text-gray-300"></i>
+                                    @endif
+                                @endfor
+                                <span class="ml-2 text-xs text-gray-600">({{ number_format($rating, 2) }})</span>
+                            </div>
+                        @endif
                     </div>
                     <div class="bg-yellow-100 p-4 rounded-full">
                         <i class="fas fa-star text-3xl text-yellow-600"></i>
@@ -185,14 +218,14 @@
                     <span class="text-sm font-medium text-gray-700">Notifications</span>
                 </a>
                 
-                <a href="{{ route('custom-services.index') }}" class="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-pink-50 to-pink-100 hover:from-pink-100 hover:to-pink-200 rounded-xl border border-pink-200 transition-all group">
-                    <div class="bg-pink-600 p-3 rounded-full mb-2 group-hover:scale-110 transition-transform">
-                        <i class="fas fa-lightbulb text-white text-xl"></i>
+                <a href="{{ route('availability.index') }}" class="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 rounded-xl border border-green-200 transition-all group">
+                    <div class="bg-green-600 p-3 rounded-full mb-2 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-calendar-alt text-white text-xl"></i>
                     </div>
-                    <span class="text-sm font-medium text-gray-700">Custom Services</span>
+                    <span class="text-sm font-medium text-gray-700">Availability Calendar</span>
                 </a>
                 
-                <a href="{{ route('profile') }}" class="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 rounded-xl border border-green-200 transition-all group">
+                <a href="{{ route('profile') }}" class="flex flex-col items-center justify-center p-4 bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl border border-gray-200 transition-all group">
                     <div class="bg-green-600 p-3 rounded-full mb-2 group-hover:scale-110 transition-transform">
                         <i class="fas fa-cog text-white text-xl"></i>
                     </div>

@@ -122,6 +122,16 @@
                         {{ $user->servicemanProfile->is_available ? 'Available' : 'Busy' }}
                     </span>
                     
+                    @if($user->servicemanProfile->category && $user->servicemanProfile->rating)
+                        @php
+                            $rank = $user->servicemanProfile->getCategoryRank();
+                        @endphp
+                        <span class="px-3 py-1 text-xs sm:text-sm font-medium rounded-full bg-purple-100 text-purple-800">
+                            <i class="fas fa-trophy mr-1"></i>
+                            Rank #{{ $rank }} in {{ $user->servicemanProfile->category->name }}
+                        </span>
+                    @endif
+                    
                     @if($user->servicemanProfile->experience_years)
                         <span class="text-xs sm:text-sm text-gray-600">
                             <i class="fas fa-calendar-alt mr-1"></i>
@@ -149,13 +159,16 @@
                         <p class="text-xs text-gray-500 text-center">Use admin controls above for actions</p>
                     </div>
                 @elseif(auth()->user()->isClient())
-                    @if($user->servicemanProfile->is_available)
+                    @php
+                        $canBook = isset($isAvailableForBooking) ? $isAvailableForBooking : ($user->isServiceman() ? $user->isAvailableForBooking() : false);
+                    @endphp
+                    @if($canBook)
                         <a href="{{ route('service-requests.create') }}?serviceman_id={{ $user->id }}" 
                            class="w-full sm:w-auto block sm:inline-block text-center bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg whitespace-nowrap">
                             <i class="fas fa-calendar-check mr-2"></i>Book Now
                         </a>
                     @else
-                        <button disabled class="w-full sm:w-auto block sm:inline-block text-center bg-gray-400 text-white px-6 py-3 rounded-lg font-semibold cursor-not-allowed whitespace-nowrap">
+                        <button disabled class="w-full sm:w-auto block sm:inline-block text-center bg-gray-400 text-white px-6 py-3 rounded-lg font-semibold cursor-not-allowed whitespace-nowrap" title="This serviceman is currently unavailable for booking">
                             <i class="fas fa-ban mr-2"></i>Currently Unavailable
                         </button>
                     @endif
@@ -178,6 +191,34 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Content -->
         <div class="lg:col-span-2 space-y-6">
+            <!-- Availability Calendar - Moved to main content for more space -->
+            <div class="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+                <h3 class="text-xl sm:text-2xl font-semibold text-gray-900 mb-4 flex items-center">
+                    <i class="fas fa-calendar-alt text-blue-600 mr-2"></i>
+                    Availability Calendar
+                </h3>
+                <div id="calendar-container" class="availability-calendar-wrapper mb-4"></div>
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div class="flex items-center flex-wrap gap-4 text-xs sm:text-sm">
+                            <div class="flex items-center">
+                                <div class="w-5 h-5 bg-gray-100 border-2 border-gray-300 rounded mr-2 flex items-center justify-center">
+                                    <i class="fas fa-check text-green-600 text-xs"></i>
+                                </div>
+                                <span class="text-gray-700 font-medium">Available</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-5 h-5 bg-red-500 rounded mr-2 flex items-center justify-center">
+                                    <i class="fas fa-times text-white text-xs"></i>
+                                </div>
+                                <span class="text-gray-700 font-medium">Busy</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 sm:text-right">All dates are available unless marked as busy</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- About -->
             @if($user->servicemanProfile->bio)
                 <div class="bg-white rounded-lg shadow-sm p-6">
@@ -237,19 +278,294 @@
                     </div>
                     <span class="text-gray-700">{{ $user->servicemanProfile->category->name ?? 'Professional' }}</span>
                 </div>
+                @if($user->servicemanProfile->category && $user->servicemanProfile->rating)
+                    @php
+                        $rank = $user->servicemanProfile->getCategoryRank();
+                    @endphp
+                    <div class="mt-3 pt-3 border-t border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600">Category Ranking:</span>
+                            <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-sm font-semibold">
+                                #{{ $rank }}
+                            </span>
+                        </div>
+                    </div>
+                @endif
             </div>
 
-            <!-- Availability -->
+            <!-- Availability Status -->
             <div class="bg-white rounded-lg shadow-sm p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Availability</h3>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Current Status</h3>
                 <div class="flex items-center">
-                    <div class="w-3 h-3 rounded-full {{ $user->servicemanProfile->is_available ? 'bg-green-500' : 'bg-red-500' }} mr-3"></div>
-                    <span class="text-gray-700">
-                        {{ $user->servicemanProfile->is_available ? 'Currently Available' : 'Currently Busy' }}
+                    @php
+                        $isBusyToday = isset($isBusyToday) ? $isBusyToday : ($user->isServiceman() ? $user->isBusyOnDate(\Carbon\Carbon::today()) : false);
+                        $isActuallyAvailable = $user->servicemanProfile->is_available && !$isBusyToday;
+                    @endphp
+                    <div class="w-3 h-3 rounded-full {{ $isActuallyAvailable ? 'bg-green-500' : 'bg-red-500' }} mr-3"></div>
+                    <span class="text-gray-700 font-medium">
+                        {{ $isActuallyAvailable ? 'Currently Available' : 'Currently Unavailable' }}
                     </span>
                 </div>
+                @if($isBusyToday)
+                    <p class="text-xs text-red-600 mt-2 flex items-center">
+                        <i class="fas fa-calendar-times mr-1"></i>
+                        Marked as busy today - not accepting bookings
+                    </p>
+                @elseif(!$user->servicemanProfile->is_available)
+                    <p class="text-xs text-red-600 mt-2 flex items-center">
+                        <i class="fas fa-ban mr-1"></i>
+                        Currently not accepting new bookings
+                    </p>
+                @endif
             </div>
         </div>
     </div>
 </div>
+@push('styles')
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+<style>
+    /* Calendar Wrapper Styles */
+    .availability-calendar-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .availability-calendar-wrapper .fc {
+        min-width: 280px;
+    }
+    
+    /* Mobile Optimizations */
+    @media (max-width: 640px) {
+        .availability-calendar-wrapper .fc-header-toolbar {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .availability-calendar-wrapper .fc-toolbar-chunk {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        
+        .availability-calendar-wrapper .fc-toolbar-title {
+            font-size: 1rem !important;
+            margin: 0.5rem 0;
+        }
+        
+        .availability-calendar-wrapper .fc-button {
+            padding: 0.4rem 0.6rem !important;
+            font-size: 0.875rem !important;
+        }
+        
+        .availability-calendar-wrapper .fc-daygrid-day {
+            min-height: 70px !important;
+        }
+        
+        .availability-calendar-wrapper .fc-daygrid-day-number {
+            padding: 0.25rem !important;
+            font-size: 0.875rem !important;
+        }
+        
+        .availability-calendar-wrapper .fc-col-header-cell {
+            padding: 0.5rem 0.25rem !important;
+        }
+        
+        .availability-calendar-wrapper .fc-col-header-cell-cushion {
+            font-size: 0.75rem !important;
+            font-weight: 600;
+        }
+    }
+    
+    /* Desktop Enhancements */
+    @media (min-width: 641px) {
+        .availability-calendar-wrapper .fc {
+            font-size: 1rem;
+        }
+        
+        .availability-calendar-wrapper .fc-daygrid-day {
+            min-height: 100px;
+        }
+        
+        .availability-calendar-wrapper .fc-daygrid-day-number {
+            font-size: 1rem !important;
+            padding: 0.5rem !important;
+        }
+    }
+    
+    /* Large screen enhancements */
+    @media (min-width: 1024px) {
+        .availability-calendar-wrapper .fc {
+            font-size: 1.05rem;
+        }
+        
+        .availability-calendar-wrapper .fc-daygrid-day {
+            min-height: 110px;
+        }
+        
+        .availability-calendar-wrapper .fc-col-header-cell-cushion {
+            font-size: 0.95rem !important;
+            padding: 0.75rem !important;
+        }
+    }
+    
+    /* Calendar Color Customizations */
+    .availability-calendar-wrapper .fc-theme-standard td,
+    .availability-calendar-wrapper .fc-theme-standard th {
+        border-color: #e5e7eb;
+    }
+    
+    .availability-calendar-wrapper .fc-daygrid-day-frame {
+        transition: background-color 0.2s;
+    }
+    
+    .availability-calendar-wrapper .fc-daygrid-day:hover .fc-daygrid-day-frame {
+        background-color: #f9fafb;
+    }
+    
+    .availability-calendar-wrapper .fc-day-today {
+        background-color: #eff6ff !important;
+    }
+    
+    .availability-calendar-wrapper .fc-day-today .fc-daygrid-day-number {
+        color: #2563eb;
+        font-weight: 700;
+    }
+    
+    /* Event Styling */
+    .availability-calendar-wrapper .fc-event {
+        border-radius: 4px;
+        padding: 2px 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .availability-calendar-wrapper .fc-event-title {
+        padding: 0;
+    }
+    
+    /* Button Styling */
+    .availability-calendar-wrapper .fc-button-primary {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+        color: white;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    
+    .availability-calendar-wrapper .fc-button-primary:hover {
+        background-color: #2563eb;
+        border-color: #2563eb;
+    }
+    
+    .availability-calendar-wrapper .fc-button-primary:disabled {
+        background-color: #9ca3af;
+        border-color: #9ca3af;
+        opacity: 0.6;
+    }
+    
+    .availability-calendar-wrapper .fc-button-active {
+        background-color: #1d4ed8;
+        border-color: #1d4ed8;
+    }
+    
+    /* Header Styling */
+    .availability-calendar-wrapper .fc-toolbar-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #111827;
+    }
+    
+    /* Improve readability on small screens */
+    @media (max-width: 640px) {
+        .availability-calendar-wrapper {
+            margin: 0 -0.5rem;
+        }
+        
+        .availability-calendar-wrapper .fc {
+            padding: 0.5rem;
+        }
+    }
+</style>
+@endpush
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarContainer = document.getElementById('calendar-container');
+    if (calendarContainer) {
+        // Detect mobile screen
+        const isMobile = window.innerWidth < 640;
+        
+        const calendar = new FullCalendar.Calendar(calendarContainer, {
+            initialView: isMobile ? 'dayGridMonth' : 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: ''
+            },
+            height: isMobile ? 400 : 550,
+            aspectRatio: isMobile ? 1.0 : 2.0,
+            events: '{{ route("servicemen.calendar", $user->id) }}',
+            eventDisplay: 'block',
+            eventTimeFormat: {
+                hour: '2-digit',
+                minute: '2-digit',
+                meridiem: false
+            },
+            dayMaxEvents: true,
+            moreLinkClick: 'popover',
+            eventDidMount: function(info) {
+                // Only busy dates are shown as events (red)
+                if (info.event.title === 'Busy') {
+                    info.el.style.backgroundColor = '#ef4444';
+                    info.el.style.borderColor = '#dc2626';
+                    info.el.style.color = 'white';
+                    info.el.style.fontWeight = '600';
+                    info.el.title = 'Busy - Not available for booking';
+                    
+                    // Add icon for busy dates
+                    const titleEl = info.el.querySelector('.fc-event-title');
+                    if (titleEl && !titleEl.innerHTML.includes('fa-times')) {
+                        titleEl.innerHTML = '<i class="fas fa-times mr-1"></i> Busy';
+                    }
+                }
+            },
+            eventClick: function(info) {
+                // Prevent default action
+                info.jsEvent.preventDefault();
+            },
+            // Improve date cell rendering
+            dayCellDidMount: function(info) {
+                // Add subtle hover effect
+                info.el.style.cursor = 'default';
+            },
+            // Custom date formatting
+            dayHeaderFormat: { weekday: isMobile ? 'short' : 'short' },
+            // Responsive week numbers
+            weekNumbers: false,
+            // Handle window resize
+            windowResize: function() {
+                const isNowMobile = window.innerWidth < 640;
+                if (isNowMobile !== isMobile) {
+                    calendar.setOption('aspectRatio', isNowMobile ? 1.0 : 2.0);
+                    calendar.setOption('height', isNowMobile ? 400 : 550);
+                }
+            }
+        });
+        
+        calendar.render();
+        
+        // Handle window resize
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function() {
+                calendar.updateSize();
+            }, 250);
+        });
+    }
+});
+</script>
+@endpush
 @endsection

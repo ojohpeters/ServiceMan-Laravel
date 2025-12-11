@@ -129,6 +129,18 @@
                         </div>
                     </a>
                     
+                    <!-- System Logs -->
+                    <a href="{{ route('admin.logs') }}" 
+                       class="group flex items-center p-5 bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-2xl border-2 border-gray-200 hover:border-gray-300 transition-all transform hover:scale-105 shadow-md hover:shadow-lg">
+                        <div class="bg-gradient-to-br from-gray-600 to-gray-700 p-4 rounded-xl mr-4 group-hover:scale-110 transition-transform shadow-lg">
+                            <i class="fas fa-file-alt text-white text-2xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <span class="text-sm font-bold text-gray-900 block">System Logs</span>
+                            <span class="text-xs text-gray-600">View errors & debug info</span>
+                        </div>
+                    </a>
+                    
                     <!-- Manage Testimonials -->
                     <a href="{{ route('admin.testimonials') }}" 
                        class="group flex items-center p-5 bg-gradient-to-br from-yellow-50 to-yellow-100 hover:from-yellow-100 hover:to-yellow-200 rounded-2xl border-2 border-yellow-200 hover:border-yellow-300 transition-all transform hover:scale-105 shadow-md hover:shadow-lg">
@@ -189,8 +201,8 @@
                         @endif
                     </a>
                     
-                    <!-- Custom Service Requests -->
-                    <a href="{{ route('admin.custom-service-requests') }}" 
+                    <!-- Custom Service Requests (Feature Disabled) -->
+                    {{-- <a href="{{ route('admin.custom-service-requests') }}" 
                        class="group flex items-center justify-between p-5 bg-gradient-to-br from-pink-50 to-pink-100 hover:from-pink-100 hover:to-pink-200 rounded-2xl border-2 border-pink-200 hover:border-pink-300 transition-all transform hover:scale-105 shadow-md hover:shadow-lg relative">
                         <div class="flex items-center flex-1">
                             <div class="bg-gradient-to-br from-pink-600 to-pink-700 p-4 rounded-xl mr-4 group-hover:scale-110 transition-transform shadow-lg">
@@ -209,7 +221,7 @@
                                 {{ $customRequestsCount }}
                             </span>
                         @endif
-                    </a>
+                    </a> --}}
                     
                     <!-- View Analytics -->
                     <a href="{{ route('admin.analytics') }}" 
@@ -373,29 +385,6 @@
                 </div>
             </div>
 
-            <!-- Pending Negotiations (Disabled Feature) -->
-            <div class="bg-white rounded-2xl shadow-xl overflow-hidden opacity-60">
-                <div class="bg-gradient-to-r from-yellow-50 to-orange-50 px-8 py-5 border-b border-gray-200">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-xl font-bold text-gray-900 flex items-center">
-                            <i class="fas fa-comments text-yellow-600 mr-3"></i>
-                            Pending Negotiations
-                        </h2>
-                        <span class="text-xs font-semibold text-gray-600 bg-gray-200 px-3 py-1 rounded-full">
-                            Coming Soon
-                        </span>
-                    </div>
-                </div>
-                <div class="p-6">
-                    <div class="text-center py-12">
-                        <div class="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                            <i class="fas fa-hourglass-half text-3xl text-gray-400"></i>
-                                </div>
-                        <p class="text-gray-600 font-medium mb-2">Feature Under Review</p>
-                        <p class="text-gray-500 text-sm">Negotiation functionality is currently being reviewed by management</p>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>

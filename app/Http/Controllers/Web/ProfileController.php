@@ -29,6 +29,7 @@ class ProfileController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
             'username' => 'required|string|max:255|unique:users,username,' . $user->id,
             'phone_number' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
@@ -58,6 +59,17 @@ class ProfileController extends Controller
         }
 
         $user->update($updateData);
+        
+        // Update client profile if user is a client
+        if ($user->isClient() && ($request->phone_number || $request->address)) {
+            $user->clientProfile()->updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'phone_number' => $request->phone_number,
+                    'address' => $request->address,
+                ]
+            );
+        }
 
         return back()->with('success', 'Profile updated successfully!');
     }
@@ -168,7 +180,11 @@ class ProfileController extends Controller
 
         $user->load(['servicemanProfile.category', 'ratingsReceived']);
         
-        return view('servicemen.show', compact('user'));
+        // Check if serviceman is busy today
+        $isBusyToday = $user->isBusyOnDate(\Carbon\Carbon::today());
+        $isAvailableForBooking = $user->isAvailableForBooking();
+        
+        return view('servicemen.show', compact('user', 'isBusyToday', 'isAvailableForBooking'));
     }
 }
 

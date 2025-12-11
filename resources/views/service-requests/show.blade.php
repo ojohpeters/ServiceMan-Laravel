@@ -159,8 +159,8 @@
                     </div>
                 @endif
 
-                <!-- Negotiations -->
-                @if($serviceRequest->negotiations->count() > 0)
+                <!-- Negotiations (Feature Disabled) -->
+                {{-- @if($serviceRequest->negotiations->count() > 0)
                     <div class="bg-white shadow-lg rounded-lg p-6">
                         <h2 class="text-xl font-semibold text-gray-900 mb-4">Price Negotiations</h2>
                         <div class="space-y-4">
@@ -183,7 +183,7 @@
                             @endforeach
                         </div>
                     </div>
-                @endif
+                @endif --}}
 
                 <!-- Rating Section -->
                 @if($serviceRequest->status === 'COMPLETED' && !$serviceRequest->rating && auth()->user()->isClient())
@@ -337,7 +337,13 @@
                 @endif
 
                 <!-- Backup Serviceman Information (for Admin only) -->
-                @if($serviceRequest->backup_serviceman_id && $serviceRequest->backupServiceman && auth()->user()->isAdmin())
+                @php
+                    $backupServiceman = null;
+                    if ($serviceRequest->backup_serviceman_id) {
+                        $backupServiceman = \App\Models\User::with('servicemanProfile.category')->find($serviceRequest->backup_serviceman_id);
+                    }
+                @endphp
+                @if($backupServiceman && auth()->user()->isAdmin())
                     <div class="bg-white shadow-lg rounded-2xl p-6 border-l-4 border-orange-500">
                         <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
                             <i class="fas fa-shield-alt mr-3 text-orange-600 text-xl"></i>
@@ -345,38 +351,58 @@
                         </h3>
                         <div class="space-y-4">
                             <div class="flex items-center space-x-3">
-                                <img src="{{ $serviceRequest->backupServiceman->profile_picture_url }}" 
-                                     alt="{{ $serviceRequest->backupServiceman->full_name }}" 
+                                <img src="{{ $backupServiceman->profile_picture_url }}" 
+                                     alt="{{ $backupServiceman->full_name }}" 
                                      class="w-16 h-16 rounded-full object-cover border-4 border-orange-200 shadow-lg">
                                 <div class="flex-1">
-                                    <p class="font-bold text-gray-900 text-lg">{{ $serviceRequest->backupServiceman->full_name }}</p>
-                                    <p class="text-sm text-gray-600">Backup / Standby</p>
+                                    <p class="font-bold text-gray-900 text-lg">{{ $backupServiceman->full_name }}</p>
+                                    <p class="text-sm text-gray-600">{{ $backupServiceman->servicemanProfile->category->name ?? 'Service Provider' }}</p>
+                                    @if($backupServiceman->servicemanProfile)
+                                        <div class="flex items-center mt-1">
+                                            @for($i = 1; $i <= 5; $i++)
+                                                <i class="fas fa-star text-xs {{ $i <= ($backupServiceman->servicemanProfile->rating ?? 0) ? 'text-yellow-400' : 'text-gray-300' }}"></i>
+                                            @endfor
+                                            <span class="text-xs text-gray-600 ml-1">({{ $backupServiceman->servicemanProfile->rating ?? 0 }})</span>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                             <div class="space-y-2 pt-3 border-t border-gray-200">
                                 <div class="flex items-center space-x-2 text-sm">
                                     <i class="fas fa-envelope text-blue-600 w-5"></i>
-                                    <a href="mailto:{{ $serviceRequest->backupServiceman->email }}" class="text-blue-600 hover:underline font-medium">
-                                        {{ $serviceRequest->backupServiceman->email }}
+                                    <a href="mailto:{{ $backupServiceman->email }}" class="text-blue-600 hover:underline font-medium">
+                                        {{ $backupServiceman->email }}
                                     </a>
                                 </div>
                                 <div class="flex items-center space-x-2 text-sm">
                                     <i class="fas fa-phone text-green-600 w-5"></i>
-                                    <a href="tel:{{ $serviceRequest->backupServiceman->phone_number }}" class="text-green-600 hover:underline font-medium">
-                                        {{ $serviceRequest->backupServiceman->phone_number }}
+                                    <a href="tel:{{ $backupServiceman->phone_number }}" class="text-green-600 hover:underline font-medium">
+                                        {{ $backupServiceman->phone_number }}
                                     </a>
                                 </div>
-                                @if($serviceRequest->backupServiceman->servicemanProfile)
+                                @if($backupServiceman->servicemanProfile)
                                     <div class="flex items-center space-x-2 text-sm">
                                         <i class="fas fa-briefcase text-purple-600 w-5"></i>
-                                        <span class="text-gray-700">{{ $serviceRequest->backupServiceman->servicemanProfile->experience_years ?? 0 }} years experience</span>
+                                        <span class="text-gray-700">{{ $backupServiceman->servicemanProfile->experience_years ?? 0 }} years experience</span>
                                     </div>
+                                    @if($backupServiceman->servicemanProfile->total_jobs_completed ?? 0 > 0)
+                                        <div class="flex items-center space-x-2 text-sm">
+                                            <i class="fas fa-check-circle text-green-600 w-5"></i>
+                                            <span class="text-gray-700">{{ $backupServiceman->servicemanProfile->total_jobs_completed ?? 0 }} jobs completed</span>
+                                        </div>
+                                    @endif
                                 @endif
                             </div>
                             <div class="pt-3 border-t border-gray-200">
-                                <a href="tel:{{ $serviceRequest->backupServiceman->phone_number }}" 
+                                <div class="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
+                                    <p class="text-xs text-orange-800">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        <strong>Backup Role:</strong> This serviceman will step in if the primary serviceman becomes unavailable.
+                                    </p>
+                                </div>
+                                <a href="tel:{{ $backupServiceman->phone_number }}" 
                                    class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors">
-                                    <i class="fas fa-phone mr-2"></i>Call Backup
+                                    <i class="fas fa-phone mr-2"></i>Call Backup Serviceman
                                 </a>
                             </div>
                         </div>
@@ -409,12 +435,19 @@
                                     <i class="fas fa-clock mr-2"></i>Waiting for Serviceman Assignment
                                 </div>
                                 <p class="text-sm text-gray-600 text-center">Your booking fee has been paid. We're assigning a serviceman to your request.</p>
-                            @elseif($serviceRequest->status === 'ASSIGNED_TO_SERVICEMAN')
+                            @elseif($serviceRequest->status === 'ASSIGNED_TO_SERVICEMAN' && $serviceRequest->serviceman_id)
                                 <!-- Serviceman assigned, waiting for inspection -->
-                                <div class="w-full bg-gray-400 text-white font-medium py-2 px-4 rounded-lg text-center">
-                                    <i class="fas fa-search mr-2"></i>Serviceman Inspecting Location
-                                </div>
-                                <p class="text-sm text-gray-600 text-center">Your serviceman is inspecting the location and will provide a cost estimate soon.</p>
+                                @if($serviceRequest->accepted_at)
+                                    <div class="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-lg text-center">
+                                        <i class="fas fa-search mr-2"></i>Serviceman Inspecting Location
+                                    </div>
+                                    <p class="text-sm text-gray-600 text-center">Your serviceman {{ $serviceRequest->serviceman->full_name }} has accepted the assignment and is inspecting the location. They will provide a cost estimate soon.</p>
+                                @else
+                                    <div class="w-full bg-yellow-600 text-white font-medium py-2 px-4 rounded-lg text-center">
+                                        <i class="fas fa-clock mr-2"></i>Waiting for Serviceman Acceptance
+                                    </div>
+                                    <p class="text-sm text-gray-600 text-center">Your serviceman {{ $serviceRequest->serviceman->full_name ?? 'has been assigned' }} has been assigned. They will accept the assignment and inspect the location soon.</p>
+                                @endif
                             @elseif($serviceRequest->status === 'SERVICEMAN_INSPECTED')
                                 <!-- Serviceman has inspected, waiting for admin to set final cost -->
                                 <div class="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-lg text-center">
@@ -435,21 +468,13 @@
                                     </button>
                                 </form>
                                 
-                                <button 
-                                    onclick="showComingSoonMessage(event)"
-                                    title="Coming Soon - Feature under review by management"
-                                    class="w-full bg-gray-400 text-gray-100 font-medium py-2 px-4 rounded-lg cursor-not-allowed relative group transition-all">
-                                    <i class="fas fa-hourglass-half mr-2"></i>Negotiate Price (Coming Soon)
-                                    <span class="absolute hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-2 px-3 -top-12 left-1/2 transform -translate-x-1/2 whitespace-nowrap shadow-lg z-10 pointer-events-none">
-                                        💬 Coming Soon - Feature under review by management
-                                    </span>
-                                </button>
+                                {{-- Negotiate Price button removed - Feature disabled --}}
                             @elseif($serviceRequest->status === 'NEGOTIATING')
-                                <!-- Negotiation in progress (Feature disabled) -->
-                                <div class="w-full bg-blue-500 text-white font-medium py-2 px-4 rounded-lg text-center">
+                                {{-- Negotiation status - Feature disabled --}}
+                                {{-- <div class="w-full bg-blue-500 text-white font-medium py-2 px-4 rounded-lg text-center">
                                     <i class="fas fa-clock mr-2"></i>Awaiting Admin Review
                                 </div>
-                                <p class="text-sm text-gray-600 text-center">The admin is reviewing the pricing for this service request.</p>
+                                <p class="text-sm text-gray-600 text-center">The admin is reviewing the pricing for this service request.</p> --}}
                             @elseif($serviceRequest->status === 'AWAITING_PAYMENT')
                                 <!-- Final payment ready -->
                                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
@@ -503,15 +528,57 @@
                         </h3>
                         <div class="space-y-3">
                             @if($serviceRequest->status === 'ASSIGNED_TO_SERVICEMAN')
-                                <div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-3 animate-pulse">
-                                    <p class="text-sm font-bold text-blue-900 mb-2 flex items-center">
-                                        <i class="fas fa-exclamation-circle mr-2 text-lg"></i>Action Required - Submit Your Estimate
-                                    </p>
-                                    <p class="text-sm text-blue-800 mb-4">You have been assigned to this job. Please inspect the location and submit your cost estimate to proceed.</p>
-                                    <button type="button" onclick="toggleEstimateForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg">
-                                        <i class="fas fa-calculator mr-2 text-xl"></i>Submit Inspection & Cost Estimate
-                                    </button>
-                                </div>
+                                @if(!$serviceRequest->accepted_at)
+                                    <!-- Accept/Decline Assignment -->
+                                    <div class="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 mb-3">
+                                        <p class="text-sm font-bold text-yellow-900 mb-2 flex items-center">
+                                            <i class="fas fa-question-circle mr-2 text-lg"></i>Assignment Received
+                                        </p>
+                                        <p class="text-sm text-yellow-800 mb-4">You have been assigned to this job. Please accept or decline the assignment.</p>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <form action="{{ route('service-requests.accept', $serviceRequest) }}" method="POST">
+                                                @csrf
+                                                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg">
+                                                    <i class="fas fa-check mr-2"></i>Accept
+                                                </button>
+                                            </form>
+                                            <button type="button" onclick="toggleDeclineForm()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg">
+                                                <i class="fas fa-times mr-2"></i>Decline
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Decline Form (Hidden) -->
+                                    <div id="declineForm" class="hidden bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-3">
+                                        <p class="text-sm font-bold text-red-900 mb-2">Decline Assignment</p>
+                                        <form action="{{ route('service-requests.decline', $serviceRequest) }}" method="POST">
+                                            @csrf
+                                            <div class="mb-3">
+                                                <label class="block text-sm font-semibold text-gray-700 mb-1">Reason (Optional)</label>
+                                                <textarea name="decline_reason" rows="3" maxlength="500" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"></textarea>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                                                    <i class="fas fa-times mr-2"></i>Confirm Decline
+                                                </button>
+                                                <button type="button" onclick="toggleDeclineForm()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                @else
+                                    <!-- Already Accepted - Show Estimate Form -->
+                                    <div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-3">
+                                        <p class="text-sm font-bold text-blue-900 mb-2 flex items-center">
+                                            <i class="fas fa-exclamation-circle mr-2 text-lg"></i>Action Required - Submit Your Estimate
+                                        </p>
+                                        <p class="text-sm text-blue-800 mb-4">You have accepted this assignment. Please inspect the location and submit your cost estimate to proceed.</p>
+                                        <button type="button" onclick="toggleEstimateForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105 text-lg">
+                                            <i class="fas fa-calculator mr-2 text-xl"></i>Submit Inspection & Cost Estimate
+                                        </button>
+                                    </div>
+                                @endif
                             @elseif($serviceRequest->status === 'PAYMENT_CONFIRMED')
                                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-3">
                                     <p class="text-sm font-semibold text-yellow-900 mb-2">
@@ -660,9 +727,10 @@
                             @elseif($serviceRequest->status === 'NEGOTIATING')
                                 <div class="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg">
                                     <p class="text-sm font-semibold text-orange-900 mb-2">
-                                        <i class="fas fa-handshake mr-2"></i>Price Negotiation In Progress
+                                        {{-- Price Negotiation In Progress - Feature disabled --}}
+                                        {{-- <i class="fas fa-handshake mr-2"></i>Price Negotiation In Progress --}}
                                     </p>
-                                    @if($serviceRequest->negotiations->count() > 0)
+                                    {{-- @if($serviceRequest->negotiations->count() > 0)
                                         @php $latestNegotiation = $serviceRequest->negotiations->sortByDesc('created_at')->first(); @endphp
                                         <div class="bg-white rounded-lg p-3 mb-3 border border-orange-200">
                                             <div class="flex justify-between items-center mb-2">
@@ -678,7 +746,7 @@
                                         <a href="{{ route('admin.service-requests') }}" class="block w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg text-center">
                                             <i class="fas fa-gavel mr-2"></i>Review Negotiation
                                         </a>
-                                    @endif
+                                    @endif --}}
                                 </div>
 
                             @elseif($serviceRequest->status === 'COMPLETED')
@@ -693,6 +761,20 @@
                                     <i class="fas fa-info-circle text-2xl text-blue-600 mb-2"></i>
                                     <p class="text-sm text-blue-900">No admin action required at this stage</p>
                                     <p class="text-xs text-blue-700 mt-1">Status: {{ str_replace('_', ' ', $serviceRequest->status) }}</p>
+                                </div>
+                            @endif
+
+                            <!-- Change Serviceman (Available when serviceman is assigned) -->
+                            @if($serviceRequest->serviceman_id && $serviceRequest->serviceman)
+                                <div class="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg mt-4">
+                                    <p class="text-sm font-semibold text-orange-900 mb-2">
+                                        <i class="fas fa-user-exchange mr-2"></i>Change Serviceman
+                                    </p>
+                                    <p class="text-xs text-orange-700 mb-3">Need to reassign this request to a different serviceman? You can change both primary and backup servicemen.</p>
+                                    <button onclick="showChangeServicemanModal({{ $serviceRequest->id }}, '{{ $serviceRequest->serviceman->full_name }}', {{ $serviceRequest->category_id }}, {{ $serviceRequest->serviceman_id }}, {{ $serviceRequest->backup_serviceman_id ?? 'null' }})" 
+                                            class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg">
+                                        <i class="fas fa-exchange-alt mr-2"></i>Change Serviceman
+                                    </button>
                                 </div>
                             @endif
 
@@ -931,76 +1013,6 @@
     </div>
 </div>
 
-<!-- Negotiation Modal -->
-<div id="negotiationModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-        <div class="flex justify-between items-center pb-3 border-b">
-            <h3 class="text-lg font-semibold text-gray-900">Negotiate Price</h3>
-            <button onclick="toggleNegotiationForm()" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-        </div>
-        
-        <div class="mt-4">
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                <h4 class="font-semibold text-yellow-800 mb-2">Current Final Cost</h4>
-                <p class="text-2xl font-bold text-yellow-600">₦{{ number_format($serviceRequest->final_cost) }}</p>
-            </div>
-            
-            <form action="{{ route('service-requests.negotiate', $serviceRequest) }}" method="POST" id="negotiationForm" onsubmit="console.log('Negotiation form submitting...')">
-                @csrf
-                <div class="space-y-4">
-                    <div>
-                        <label for="proposed_amount_neg" class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="fas fa-money-bill-wave mr-1 text-yellow-600"></i>Your Proposed Amount (₦) <span class="text-red-500">*</span>
-                        </label>
-                        <input type="number" 
-                               id="proposed_amount_neg" 
-                               name="proposed_amount" 
-                               required
-                               min="1" 
-                               max="{{ $serviceRequest->final_cost }}"
-                               placeholder="Enter your proposed amount"
-                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all">
-                        <p class="text-xs text-gray-600 mt-1">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Maximum: ₦{{ number_format($serviceRequest->final_cost) }}. Enter a lower amount you believe is fair.
-                        </p>
-                    </div>
-                    
-                    <div>
-                        <label for="negotiation_reason" class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="fas fa-comment-dots mr-1 text-yellow-600"></i>Reason for Negotiation <span class="text-red-500">*</span>
-                        </label>
-                        <textarea id="negotiation_reason" 
-                                  name="negotiation_reason" 
-                                  rows="4" 
-                                  required
-                                  placeholder="Please explain why you think the price should be reduced... (Be specific - budget constraints, market rates, etc.)"
-                                  class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all"></textarea>
-                        <p class="text-xs text-gray-600 mt-1">
-                            <i class="fas fa-lightbulb mr-1"></i>
-                            A detailed explanation helps admin review your request faster
-                        </p>
-                    </div>
-                    
-                    <div class="flex space-x-3 pt-2">
-                        <button type="button" 
-                                onclick="toggleNegotiationForm()" 
-                                class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 px-4 rounded-lg transition-colors shadow-sm">
-                            <i class="fas fa-times mr-2"></i>Cancel
-                        </button>
-                        <button type="submit" 
-                                class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-                            <i class="fas fa-paper-plane mr-2"></i>Submit Negotiation
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
 <script>
 function showComingSoonMessage(event) {
     event.preventDefault();
@@ -1034,6 +1046,13 @@ function toggleNegotiationForm() {
     return false;
 }
 
+function toggleDeclineForm() {
+    const form = document.getElementById('declineForm');
+    if (form) {
+        form.classList.toggle('hidden');
+    }
+}
+
 function toggleEstimateForm() {
     const modal = document.getElementById('estimateModal');
     if (modal) {
@@ -1056,7 +1075,7 @@ function toggleEstimateForm() {
 document.addEventListener('DOMContentLoaded', function() {
     const notesTextarea = document.getElementById('inspection_notes');
     const notesCount = document.getElementById('notes-char-count');
-    
+    a
     if (notesTextarea && notesCount) {
         notesTextarea.addEventListener('input', function() {
             notesCount.textContent = this.value.length;
@@ -1258,7 +1277,154 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
     console.log('Form validation passed, submitting...');
     // Let it submit normally
 });
+
+// Change Serviceman Modal Functions
+function showChangeServicemanModal(requestId, currentServicemanName, categoryId, currentServicemanId, currentBackupId) {
+    document.getElementById('changeServicemanModal').classList.remove('hidden');
+    
+    // Update modal content
+    document.getElementById('changeModalCurrentServiceman').textContent = currentServicemanName;
+    
+    // Form action is already set in the HTML
+    
+    // Clear any previous selections
+    document.getElementById('newServicemanSelect').value = '';
+    document.getElementById('newBackupServicemanSelect').value = '';
+    document.getElementById('reassignmentReason').value = '';
+    
+    // Show modal
+    document.body.style.overflow = 'hidden';
+}
+
+function closeChangeServicemanModal() {
+    document.getElementById('changeServicemanModal').classList.add('hidden');
+    document.getElementById('changeForm').reset();
+    document.body.style.overflow = 'auto';
+}
+
+// Close modal when clicking outside
+document.getElementById('changeServicemanModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeChangeServicemanModal();
+    }
+});
 </script>
+
+<!-- Change Serviceman Modal -->
+<div id="changeServicemanModal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-6 border w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-2xl bg-white">
+        <div class="flex justify-between items-center pb-4 border-b-2 border-gray-200">
+            <h3 class="text-2xl font-bold text-gray-900">
+                <i class="fas fa-exchange-alt mr-2"></i>Change Serviceman
+            </h3>
+            <button onclick="closeChangeServicemanModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <form id="changeForm" method="POST" action="{{ route('admin.service-requests.change-serviceman', $serviceRequest) }}" class="mt-6">
+            @csrf
+            <div class="space-y-5">
+                <!-- Current Assignment Info -->
+                <div class="bg-orange-50 border border-orange-200 rounded-lg p-5">
+                    <label class="block text-sm font-bold text-gray-900 mb-3">
+                        <i class="fas fa-info-circle mr-2 text-orange-600"></i>Current Assignment
+                    </label>
+                    <div class="space-y-2">
+                        <p class="text-sm"><strong>Current Primary Serviceman:</strong> <span id="changeModalCurrentServiceman" class="text-orange-700 font-semibold"></span></p>
+                        <p class="text-xs text-gray-600 mt-2 bg-orange-100 rounded-lg p-2">
+                            <i class="fas fa-lightbulb mr-1"></i>
+                            Select a new primary serviceman. You can also assign an optional backup serviceman.
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- New Primary Serviceman -->
+                <div>
+                    <label for="newServicemanSelect" class="block text-sm font-bold text-gray-900 mb-2">
+                        <i class="fas fa-user-check text-blue-500 mr-2"></i>
+                        New Primary Serviceman <span class="text-red-500">*</span>
+                    </label>
+                    <select id="newServicemanSelect" 
+                            name="new_serviceman_id"
+                            required
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
+                        <option value="">Select new serviceman...</option>
+                        @foreach($availableServicemen ?? [] as $serviceman)
+                            <option value="{{ $serviceman['id'] }}">
+                                {{ $serviceman['full_name'] }} - 
+                                {{ $serviceman['experience_years'] }} years exp - 
+                                Rating: {{ number_format($serviceman['rating'], 1) }}
+                                @if($serviceman['id'] == ($serviceRequest->serviceman_id ?? 0))
+                                    (Currently Assigned)
+                                @elseif(!$serviceman['is_available'])
+                                    (Currently Busy)
+                                @endif
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="mt-2 text-xs text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Select the new primary serviceman for this request.
+                    </p>
+                </div>
+                
+                <!-- New Backup Serviceman (Optional) -->
+                <div>
+                    <label for="newBackupServicemanSelect" class="block text-sm font-bold text-gray-900 mb-2">
+                        <i class="fas fa-user-shield text-purple-500 mr-2"></i>
+                        New Backup Serviceman (Optional)
+                    </label>
+                    <select id="newBackupServicemanSelect" 
+                            name="backup_serviceman_id"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all">
+                        <option value="">No backup serviceman (optional)</option>
+                        @foreach($availableServicemen ?? [] as $serviceman)
+                            <option value="{{ $serviceman['id'] }}">
+                                {{ $serviceman['full_name'] }} - 
+                                {{ $serviceman['experience_years'] }} years exp - 
+                                Rating: {{ number_format($serviceman['rating'], 1) }}
+                                @if(!$serviceman['is_available'])
+                                    (Currently Busy)
+                                @endif
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="mt-2 text-xs text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Optionally select a backup serviceman as a standby.
+                    </p>
+                </div>
+                
+                <!-- Reason for Change (Optional) -->
+                <div>
+                    <label for="reassignmentReason" class="block text-sm font-bold text-gray-900 mb-2">
+                        <i class="fas fa-comment-dots text-gray-500 mr-2"></i>
+                        Reason for Change (Optional)
+                    </label>
+                    <textarea id="reassignmentReason" 
+                              name="reassignment_reason" 
+                              rows="3"
+                              placeholder="Provide a reason for changing the serviceman (this will be included in notifications)..."
+                              class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all resize-none"></textarea>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3 mt-8 pt-6 border-t-2 border-gray-200">
+                <button type="button" 
+                        onclick="closeChangeServicemanModal()"
+                        class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-all transform hover:scale-105">
+                    <i class="fas fa-times mr-2"></i>Cancel
+                </button>
+                <button type="submit" 
+                        class="flex-1 px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors shadow-lg hover:shadow-xl">
+                    <i class="fas fa-exchange-alt mr-2"></i>Change Serviceman
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- Assign Serviceman Modal -->
 <div id="assignModal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm overflow-y-auto h-full w-full hidden z-50">

@@ -1,0 +1,56 @@
+===========================================
+CPANEL - FIX INDEX-OF DIRECTORY LISTING
+===========================================
+
+PROBLEM: Seeing directory listing instead of your Laravel site.
+
+SOLUTION: Point subdomain document root to public folder
+
+METHOD 1: Change Document Root in cPanel (RECOMMENDED)
+
+1. Log into cPanel
+2. Go to "Subdomains" (under "Domains" section)
+3. Find "serviceman.sekimbi.com"
+4. Click on it or click "Manage"
+5. Look for "Document Root" field
+6. Change it from:
+   /home/sekionzy/serviceman.sekimbi.com
+   
+   To:
+   /home/sekionzy/serviceman.sekimbi.com/public
+
+7. Save/Update
+8. Wait 1-2 minutes for changes to propagate
+9. Refresh your site
+
+METHOD 2: If you can't change document root, update .htaccess
+
+Make sure this .htaccess exists in:
+/home/sekionzy/serviceman.sekimbi.com/.htaccess
+
+Content:
+---
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Redirect everything to public directory
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/$1 [L]
+    
+    # If accessing root directly, serve public/index.php
+    RewriteCond %{REQUEST_URI} ^/$
+    RewriteRule ^(.*)$ public/index.php [L]
+</IfModule>
+
+# Prevent directory listing
+Options -Indexes
+---
+
+Then test your site again.
+
+VERIFY:
+After fixing, visit: http://serviceman.sekimbi.com
+You should see your Laravel home page, NOT directory listing.
+

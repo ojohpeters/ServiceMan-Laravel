@@ -78,6 +78,20 @@
                             <p class="text-sm font-medium text-gray-500">Last Name</p>
                             <p class="text-gray-900">{{ $user->last_name }}</p>
                         </div>
+                        @if($user->isClient())
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">
+                                    <i class="fas fa-phone mr-1 text-gray-400"></i>Phone Number
+                                </p>
+                                <p class="text-gray-900">{{ ($user->clientProfile && $user->clientProfile->phone_number) ? $user->clientProfile->phone_number : 'Not provided' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">
+                                    <i class="fas fa-map-marker-alt mr-1 text-gray-400"></i>Address
+                                </p>
+                                <p class="text-gray-900">{{ ($user->clientProfile && $user->clientProfile->address) ? $user->clientProfile->address : 'Not provided' }}</p>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
@@ -110,6 +124,33 @@
                         <input type="email" id="email" name="email" value="{{ $user->email }}" required 
                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                     </div>
+                    
+                    @if($user->isClient())
+                        <div>
+                            <label for="phone_number" class="block text-sm font-medium text-gray-700">
+                                <i class="fas fa-phone mr-1 text-gray-500"></i>
+                                Phone Number
+                            </label>
+                            <input type="tel" id="phone_number" name="phone_number" 
+                                   value="{{ old('phone_number', ($user->clientProfile && $user->clientProfile->phone_number) ? $user->clientProfile->phone_number : '') }}"
+                                   placeholder="e.g., +234 801 234 5678"
+                                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        
+                        <div>
+                            <label for="address" class="block text-sm font-medium text-gray-700">
+                                <i class="fas fa-map-marker-alt mr-1 text-gray-500"></i>
+                                Address
+                            </label>
+                            <textarea id="address" name="address" rows="3" 
+                                      placeholder="Enter your address for service location reference..."
+                                      class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm resize-none">{{ old('address', ($user->clientProfile && $user->clientProfile->address) ? $user->clientProfile->address : '') }}</textarea>
+                            <p class="mt-1 text-sm text-gray-500">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                This helps servicemen know your service location
+                            </p>
+                        </div>
+                    @endif
                     
                     <div class="flex items-center justify-end space-x-4">
                         <button type="button" onclick="cancelEdit()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-400 transition-colors">
