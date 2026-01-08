@@ -6,6 +6,7 @@ const getApiBaseURL = () => {
     // If running in Capacitor (mobile app)
     if (Capacitor.isNativePlatform()) {
         // Use your production Laravel API URL
+        // Note: API endpoints work, but /api alone returns 404 - use specific endpoints like /api/categories
         return 'https://serviceman.sekimbi.com/api';
     }
     // If running in browser (web app)
@@ -36,7 +37,10 @@ api.interceptors.response.use(
     (error) => {
         if (error.response?.status === 401) {
             localStorage.removeItem('token');
-            window.location.href = '/login';
+            // Only redirect if not in Capacitor (mobile app handles routing differently)
+            if (typeof window !== 'undefined' && !window.Capacitor) {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }
