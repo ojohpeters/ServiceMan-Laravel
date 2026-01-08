@@ -1,8 +1,20 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
+
+// Determine API base URL based on environment
+const getApiBaseURL = () => {
+    // If running in Capacitor (mobile app)
+    if (Capacitor.isNativePlatform()) {
+        // Use your production Laravel API URL
+        return 'https://serviceman.sekimbi.com/api';
+    }
+    // If running in browser (web app)
+    return '/api';
+};
 
 // Create axios instance with base configuration
 const api = axios.create({
-    baseURL: '/api',
+    baseURL: getApiBaseURL(),
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

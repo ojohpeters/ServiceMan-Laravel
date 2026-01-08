@@ -22,6 +22,11 @@ return [
     'allowed_origins' => [
         env('FRONTEND_URL', 'http://localhost:3000'),
         env('APP_URL', 'http://localhost:8000'),
+        'capacitor://localhost',
+        'ionic://localhost',
+        'http://localhost',
+        'http://localhost:8080',
+        'http://localhost:8100',
     ],
 
     'allowed_origins_patterns' => [],

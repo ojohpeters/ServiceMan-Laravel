@@ -10,7 +10,12 @@
         "hot": "vite --host",
         "preview": "vite preview",
         "lint": "eslint resources/js --ext .js,.jsx",
-        "lint:fix": "eslint resources/js --ext .js,.jsx --fix"
+        "lint:fix": "eslint resources/js --ext .js,.jsx --fix",
+        "cap:sync": "npx cap sync",
+        "cap:build": "npm run build && node scripts/generate-mobile-index.js && npx cap sync",
+        "cap:android": "npx cap open android",
+        "cap:copy": "npx cap copy",
+        "mobile:build": "npm run cap:build"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
@@ -21,6 +26,12 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
+        "@capacitor/android": "^8.0.0",
+        "@capacitor/app": "^8.0.0",
+        "@capacitor/cli": "^8.0.0",
+        "@capacitor/core": "^8.0.0",
+        "@capacitor/http": "^0.0.2",
+        "@capacitor/status-bar": "^8.0.0",
         "@heroicons/react": "^2.2.0",
         "@hookform/resolvers": "^5.2.2",
         "@reduxjs/toolkit": "^2.9.0",

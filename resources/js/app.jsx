@@ -2,7 +2,8 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, HashRouter } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { store } from './store'
 import App from './components/App'
 import './bootstrap'
@@ -17,7 +18,10 @@ const queryClient = new QueryClient({
   },
 })
 
-// Check if we're in a Laravel view context
+// Use HashRouter for Capacitor (mobile app), BrowserRouter for web
+const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter
+
+// Check if we're in a Laravel view context or Capacitor
 const appElement = document.getElementById('app')
 
 if (appElement) {
@@ -25,9 +29,9 @@ if (appElement) {
   root.render(
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+        <Router>
           <App />
-        </BrowserRouter>
+        </Router>
       </QueryClientProvider>
     </Provider>
   )
